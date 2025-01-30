@@ -1,59 +1,57 @@
 import argparse
 import readline
 import sys
-import time
-from threading import Thread
-from ollama import chat
+import asyncio
+from ollama import AsyncClient
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.live import Live
 
 console = Console()
+ 
+async def fetch_stream(user_input, model, show_thinking, history, live):
+    """
+    Fetch the response stream and update the UI in real-time.
+    """
+    thinking = False 
+    client = AsyncClient()
 
-def fetch_stream(user_input, model, show_thinking, live):
-    """
-    Fetch the stream of responses and update the live console smoothly.
-    """
-    stream = chat(
-        model=model,
-        messages=[{'role': 'user', 'content': user_input}],
-        stream=True,
-    )
+    # Append user message to history
+    history.append({'role': 'user', 'content': user_input})
 
     response = ""
-    thinking = False
+    
+    # Await coroutine properly
+    stream = await client.chat(model=model, messages=history, stream=True)
 
-    # Stream and accumulate chunks
-    for chunk in stream:
+    async for chunk in stream:
         message = chunk['message']['content']
 
         if not show_thinking:
-            # If thinking process starts, display "Hmmmm..." unless --thinking is set
             if "<think>" in message:
                 thinking = True
-                live.update("[bold cyan]AI:[/] Hmmmm...")
-                continue  # Skip displaying <think> immediately
-
+                live.update("[bold cyan]AI:[/] Hmmm...")
+                continue  # Skip <think> tag itself
             if "</think>" in message:
                 thinking = False
-                live.update("[bold cyan]AI:[/] ")  # Clear "Hmmmm..." message
-                continue  # Skip displaying </think> immediately
-
-            # If the message is inside a "thinking" state, ignore it
+                continue  # Skip </think> tag itself
             if thinking:
-                continue
+                continue  # Skip text inside <think> tags
 
-        # Accumulate response and show it
+        # Update the live stream with the new chunk of text
         response += message
-        live.update(Markdown(response))  # Show the rest of the content
-        sys.stdout.flush()  # Flush to ensure output is displayed
+        live.update(Markdown(response))  # Update the live stream with the new content
 
-    live.update(Markdown(response))  # Final formatted update after streaming is done
+    # Append AI response to history
+    history.append({'role': 'assistant', 'content': response})
 
-def chat_mode(model,show_thinking):
-    print("Chat mode activated. Type 'exit' to quit.\n")
+    return response  # Return full response
 
-    history = []
+async def chat_mode(model, show_thinking=False):
+    print(f"Chat mode activated with model: {model}. Type 'exit' to quit.\n")
+
+    history = []  # Stores conversation history
+
     while True:
         try:
             user_input = input("You: ")
@@ -64,31 +62,21 @@ def chat_mode(model,show_thinking):
         if user_input.lower() == 'exit':
             break
 
-        if user_input.strip():
-            history.append(user_input)
-            readline.add_history(user_input)
+        readline.add_history(user_input)
 
-        # Set up the live console with a high refresh rate
-        with Live(console=console, refresh_per_second=30) as live:
-            # Start a background thread for fetching the stream
-            stream_thread = Thread(target=fetch_stream, args=(user_input, model, show_thinking, live))
-            stream_thread.start()
+        with Live(console=console, refresh_per_second=30, vertical_overflow="ellipsis") as live:
+            response = await fetch_stream(user_input, model, show_thinking, history, live)
+            live.update(Markdown(response))  # Final full response update
 
-            # Wait for the stream thread to complete
-            stream_thread.join()
+        print()  # Ensure clean newline after response
 
-        print()  # Ensure a newline after response
-
-def main():
-
-    model = "deepseek-r1:14b"
-    show_thinking = False
+async def main():
     parser = argparse.ArgumentParser(description="Ollama Chat Mode")
+    parser.add_argument("--model", type=str, default="deepseek-r1:14b", help="Specify the AI model")
     parser.add_argument("--thinking", action="store_true", help="Show thinking sections")
     args = parser.parse_args()
-    show_thinking = args.thinking
 
-    chat_mode(model,show_thinking)
+    await chat_mode(model=args.model, show_thinking=args.thinking)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
