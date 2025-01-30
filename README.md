@@ -1,6 +1,6 @@
-# Ollama Chat Mode with Real-Time Stream
+# DeepSeek-Shell
 
-This is a Python-based chat mode interface that interacts with an AI model using the Ollama API. The chat interface fetches real-time responses, filtering out thinking part and displays them in the terminal using the rich library for live streaming. It is a simple alternative for Shell-GPT that works with locally running deepseek-r1 models.
+This is a Python-based chat mode interface that interacts with an AI model using the Ollama API. The chat interface fetches real-time responses, filtering out thinking part and displays them in the terminal using the rich library for live streaming. It is a simple alternative for Shell-GPT that works with locally running deepseek-r1 models. Project is at early stage and so far only has a chat mode.
 
 ### Features
 
@@ -34,19 +34,19 @@ pip install ollama rich
 To run the chat mode, simply execute the script:
 
 ```
-python ollama_wrapper.py
+python deepseek_shell.py
 ```
 
 For custom model selection and thinking display, use:
 
 ```
-python ollama_wrapper.py --model 
+python deepseek_shell.py --model 
 ```
 
 **Example**
 
 ```
-$ python ollama_wrapper.py --model deepseek-r1:14b 
+$ python deepseek_shell.py --model deepseek-r1:14b 
 Chat mode activated with model: deepseek-r1:14b. Type 'exit' to quit.
 You: Hello!
 AI: Hmmm... 
