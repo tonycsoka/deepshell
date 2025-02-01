@@ -1,55 +1,111 @@
 # DeepSeek-Shell
 
-This is a Python-based chat mode interface that interacts with an AI model using the Ollama API. The chat interface fetches real-time responses, filtering out thinking part and displays them in the terminal using the rich library for live streaming. It is a simple alternative for Shell-GPT that works with locally running deepseek-r1 models. Project is at early stage and so far only has a chat mode.
+DeepSeek-Shell is a command-line tool for interacting with AI models via the Ollama API. It supports both user input through prompts and content from files or piped input. Alternative to Shell-GPT that works with locally running deepseek-r1 models.
 
 ### Features
 
-* Real-time chat with the AI model
-* Streamed responses with markdown formatting
-* Option to display thinking status while waiting for responses
-* Conversation history tracking
 * Terminal-based interface
+* Real-time chat with the AI model
+* Filtering out thinking process by default
+* Streamed responses with markdown formatting
+* File and Pipe support
+
 
 ### Requirements
 
 * Python 3.7 or higher
-* ollama package for interacting with the AI
-* rich package for live updating and markdown rendering
+* ollama package for interacting with the AI with installed and accessible model
+
+
+### Installation
 
 **You can install the necessary dependencies using pip:**
 
 ```
 pip install ollama rich
+
 ```
 
+If you want to access program anywhere from Linux terminal you can install it
+
+```
+chmod +x deepshell
+
+./deepshell --install
+
+```
+This creates a symlink to deepshell in ~/.local/bin, making it globally accessible
+
 ### Usage
-
-**Command-Line Arguments**
-
-* --model `<model>`: Specify which AI model to use (default is deepseek-r1:14b).
-* --thinking: If enabled, shows thinking sections where the model is processing.
 
 **Running the Chat**
 
 To run the chat mode, simply execute the script:
 
 ```
-python deepseek_shell.py
-```
-
-For custom model selection and thinking display, use:
+deepshell
 
 ```
-python deepseek_shell.py --model 
-```
-
-**Example**
+or if you haven't installed it:
 
 ```
-$ python deepseek_shell.py --model deepseek-r1:14b 
+python3 main.py
+
+```
+
+**Command-Line Arguments**
+
+specify additional arguments:
+
+* --model: The AI model to use (defaults to DEFAULT_MODEL).
+* --host: The Ollama API host (defaults to DEFAULT_HOST).
+* --thinking: Show the AI's thinking process (useful for debugging or understanding).
+* --prompt: Provide the initial message to start the conversation.
+* --file: Specify a file to include in the chat.
+
+
+**Pipe Support**
+
+You can also pipe input to deepshell:
+
+```
+cat input.txt | deepshell --prompt "Analyze the content"
+
+```
+As for now, piping will not be able to start a chat session.
+
+**File support**
+
+You can point deepshell at a file directly:
+
+```
+deepshell --file "input.txt" --prompt "Analyze the content"
+
+```
+This will start an interactive chat session with the file content provided as context. You can continue the conversation by typing more prompts after the initial file content is processed.
+
+**Launching with a specific model**
+
+```
+$ python deepseek --model "deepseek-r1:14b" 
 Chat mode activated with model: deepseek-r1:14b. Type 'exit' to quit.
 You: Hello!
 AI: Hmmm... 
 Hello! How can I assist you today? 😊
 You:
+
+```
+### Settings
+
+The settings for the AI model and host are located in config/settings.py
+
+```
+# config/settings.py
+
+# Default AI model
+DEFAULT_MODEL = "deepseek-r1:14b"
+
+# Default Ollama API host
+DEFAULT_HOST = "http://localhost:11434"
+
 ```
