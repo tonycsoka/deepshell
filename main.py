@@ -4,6 +4,7 @@ import sys
 from config.settings import DEFAULT_MODEL, DEFAULT_HOST
 from chat.chat_manager import start_chat
 from utils.symlink_utils import create_symlink, remove_symlink
+from utils.file_utils import read_file
 
 async def main():
     parser = argparse.ArgumentParser(description="Ollama Chat Mode") 
@@ -14,6 +15,7 @@ async def main():
     parser.add_argument("--file", type=str, help="File to include in chat")
     parser.add_argument("--install", action="store_true", help="Install symlink for deepshell")
     parser.add_argument("--uninstall", action="store_true", help="Uninstall symlink for deepshell")
+    parser.add_argument("string_input", nargs="?", type=str, help="Optional string input")
 
     args = parser.parse_args()
 
@@ -31,11 +33,14 @@ async def main():
 
     # Read file content if a file is provided
     if args.file:
-        with open(args.file, "r") as f:
-            file_content += "\n" + f.read() if file_content else f.read()
+        file_content = read_file(args.file)
 
     # Use `--prompt` as the main user query
     user_input = args.prompt
+
+    if not user_input and args.string_input:
+        # If no --prompt flag is provided, use the optional string_input
+        user_input = args.string_input
 
     await start_chat(
         model=args.model,

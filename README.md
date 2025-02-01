@@ -1,105 +1,128 @@
 # DeepSeek-Shell
 
-DeepSeek-Shell is a command-line tool for interacting with AI models via the Ollama API. It supports both user input through prompts and content from files or piped input. Alternative to Shell-GPT that works with locally running deepseek-r1 models.
+DeepSeek-Shell is a command-line tool for interacting with AI models via the Ollama API. It supports both user input through prompts and content from files or piped input. An alternative to Shell-GPT, it works with locally running deepseek-r1 models.
 
 ### Features
 
-* Terminal-based interface
-* Real-time chat with the AI model
-* Filtering out thinking process by default
-* Streamed responses with markdown formatting
-* File and Pipe support
-
+- Terminal-based interface
+- Real-time chat with the AI model
+- Filtering out thinking process by default
+- Streamed responses with markdown formatting
+- Support for reading files and folders
+- Advanced command handling: Open files, folders, and execute subsequent actions (e.g., `analyze the code`)
 
 ### Requirements
 
-* Python 3.7 or higher
-* ollama package for interacting with the AI with installed and accessible model
-
+- Python 3.7 or higher
+- Ollama package for interacting with the AI and installed models
 
 ### Installation
 
-**You can install the necessary dependencies using pip:**
+**Install the necessary dependencies using pip:**
 
 ```
 pip install ollama rich
-
 ```
 
-If you want to access program anywhere from Linux terminal you can install it
+**To access the script globally from the terminal, create a symlink:**
 
 ```
 chmod +x deepshell
-
 ./deepshell --install
-
 ```
-This creates a symlink to deepshell in ~/.local/bin, making it globally accessible
+
+This creates a symlink to `deepshell` in `~/.local/bin`, making it globally accessible.
 
 ### Usage
 
 **Running the Chat**
 
-To run the chat mode, simply execute the script:
+To start the chat mode, simply execute the script:
 
 ```
 deepshell
-
 ```
-or if you haven't installed it:
+
+Or, if you haven't installed it:
 
 ```
 python3 main.py
-
 ```
 
 **Command-Line Arguments**
 
-specify additional arguments:
+Specify additional arguments to customize the behavior:
 
-* --model: The AI model to use (defaults to DEFAULT_MODEL).
-* --host: The Ollama API host (defaults to DEFAULT_HOST).
-* --thinking: Show the AI's thinking process (useful for debugging or understanding).
-* --prompt: Provide the initial message to start the conversation.
-* --file: Specify a file to include in the chat.
-
+- `--model`: The AI model to use (defaults to `DEFAULT_MODEL`).
+- `--host`: The Ollama API host (defaults to `DEFAULT_HOST`).
+- `--thinking`: Show the AI's thinking process (useful for debugging or understanding).
+- `--prompt`: Provide the initial message to start the conversation.
+- `--file`: Specify a file to include in the chat.
 
 **Pipe Support**
 
-You can also pipe input to deepshell:
+You can pipe input to DeepSeek-Shell:
 
 ```
 cat input.txt | deepshell --prompt "Analyze the content"
-
 ```
-As for now, piping will not be able to start a chat session.
 
-**File support**
+Currently, piping will not start a chat session, but you can use it to pass content to the tool.
 
-You can point deepshell at a file directly:
+**File Support**
+
+You can specify a file directly using the `--file` flag:
 
 ```
 deepshell --file "input.txt" --prompt "Analyze the content"
+```
+
+This will start an interactive chat session with the file content provided as context. You can continue the conversation by typing additional prompts after the initial file content is processed.
+
+**Folder Support**
+
+You can open and read a folder’s contents using the following command:
 
 ```
-This will start an interactive chat session with the file content provided as context. You can continue the conversation by typing more prompts after the initial file content is processed.
+deepshell "open this folder"
+```
 
-**Launching with a specific model**
+This will read the contents of the current folder, and you can continue with other commands based on the folder’s structure.
+
+**Advanced Command Parsing**
+
+DeepSeek-Shell allows you to read files or folders and then perform additional actions in the same command. For example, you can read a file and analyze the content using the `"and"` command:
 
 ```
-$ python deepseek --model "deepseek-r1:14b" 
-Chat mode activated with model: deepseek-r1:14b. Type 'exit' to quit.
-You: Hello!
-AI: Hmmm... 
-Hello! How can I assist you today? 😊
-You:
+deepshell "open this folder and analyze the code"
+```
+
+In this case, the tool will:
+1. Open and read the content of current folder, including the content of files.
+2. Perform the action `"analyze the code"` on the content, which will be handled by the AI model.
+
+Also you can naturally ask to open file or a folder while in chat:
+```
+$ deepshell
+Chat mode activated with model: deepseek-r1:14b on http://localhost:11434. Type 'exit' to quit.
+
+You: open LICENSE and translate it to Chinese
+Reading file LICENSE:
+许可协议： MIT License
+
+版权信息： 版权所有 (c) catoni0
+
+特此授权，免费授予任何获得本软件及其相关文档文件副本的人（“软件”），无限制地处理该软件，包括但不限于使用、复制、修改、合
+并、发布、分发、 sublicense 和/或出售软件副本的权限，并允许向其提供的人员也这样做，但需遵守以下条件：
+...
 
 ```
+
 ### Settings
 
-The settings for the AI model and host are located in config/settings.py
+The settings for the AI model and host are located in `config/settings.py`.
 
-```
+```python
 # config/settings.py
 
 # Default AI model
@@ -107,5 +130,4 @@ DEFAULT_MODEL = "deepseek-r1:14b"
 
 # Default Ollama API host
 DEFAULT_HOST = "http://localhost:11434"
-
 ```
