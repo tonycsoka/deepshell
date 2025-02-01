@@ -16,42 +16,43 @@ def process_input(user_input, file_content):
 
     return user_input
 
-
 def commands_handler(user_input):
     """
-    Handles special commands such as reading a file or folder.
-    Also processes the "AND" part after reading the file or folder.
+    Handles commands for finding, opening, and reading files or folders.
+    Supports "this folder" to refer to the current directory.
+    Splits commands using 'and' for additional processing.
     """
-    user_input = user_input.strip()
+    user_input = user_input.strip().lower()
 
-    # Check if "AND" exists in the input
-    if "and" in user_input.lower():
-        # Split the input into the main action (file/folder reading) and the additional command
-        main_input, additional_action = user_input.split("and", 1)
-        main_input = main_input.strip()  # Trim any extra spaces
-        additional_action = additional_action.strip()  # Get the part after "and"
+    # Check if "and" exists to split the command into two parts
+    main_input, additional_action = (user_input.split("and", 1) + [""])[:2]
+    main_input, additional_action = main_input.strip(), additional_action.strip()
 
-        # Handle the main input (file/folder reading)
-        file_content = None
-        if main_input.lower() == "open this folder":
-            folder_path = os.getcwd()  # Get the current working directory
-            file_content = read_folder(folder_path)  # Read the folder contents
-        elif main_input.lower().startswith("open "):
-            file_path = main_input[5:].strip()
-            file_content = read_file(file_path)  # Read the file
+    # Identify action keywords (find, open, read)
+    action_words = ["find", "open", "read"]
+    tokens = main_input.split()
 
-        # After reading the file/folder, pass the additional action to process_input
-        if file_content:
-            return process_input(additional_action, file_content)  # Return the processed result of additional action
+    if not tokens:
+        return None  # No valid command found
 
-    # If "and" is not found, handle file/folder reading directly
-    if user_input.lower() == "open this folder":
-        folder_path = os.getcwd()  # Get the current working directory
-        return read_folder(folder_path)  # Read the folder contents
+    # Check for action word in the input
+    action = next((word for word in tokens if word in action_words), None)
+    if not action:
+        return None  # No recognized command found
 
-    elif user_input.lower().startswith("open "):
-        file_path = user_input[5:].strip()
-        return read_file(file_path)  # Read the file
+    # Determine the target (file/folder name)
+    target_index = tokens.index(action) + 1
+    target = " ".join(tokens[target_index:]) if target_index < len(tokens) else ""
 
-    return None  # Return None for normal input
+    # If the user specified "this folder", use the current directory
+    if target == "this folder":
+        folder_path = os.getcwd()
+        file_content = read_folder(folder_path)
+    else:
+        file_content = read_file(target) if target else None  # Try reading a file
 
+    # If file/folder content is found and there's an additional action, process it
+    if file_content and additional_action:
+        return process_input(additional_action, file_content)
+
+    return file_content

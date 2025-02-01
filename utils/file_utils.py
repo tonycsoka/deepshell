@@ -62,18 +62,22 @@ def read_folder(folder_path):
 
     except PermissionError:
         return f"Error: Permission denied to access '{folder_path}'."
-        
+      
+import os
+
 def prompt_search(missing_path):
     """
-    Searches for a missing file/folder in the home directory and prompts the user to select one.
+    Searches for a missing file or folder in the home directory and prompts the user to select one.
     """
     home_dir = os.path.expanduser("~")
     results = []
 
     for root, dirs, files in os.walk(home_dir):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]  # Exclude hidden folders
-        files = [f for f in files if not f.startswith(".")]  # Exclude hidden files
+        # Exclude hidden folders and files
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        files = [f for f in files if not f.startswith(".")]
 
+        # Search for matching files and directories
         for name in files + dirs:
             if missing_path.lower() in name.lower():
                 results.append(os.path.join(root, name))
@@ -81,8 +85,7 @@ def prompt_search(missing_path):
     if not results:
         print(f"No matches found for '{missing_path}'.")
         return None
-        
-        
+
     # Display search results to the user
     print(f"Multiple matches found for '{missing_path}'. Please choose one:")
     for i, result in enumerate(results, 1):
@@ -91,11 +94,14 @@ def prompt_search(missing_path):
     # Get user selection
     while True:
         choice = input("Enter the number of your choice, or 'cancel' to abort: ").strip().lower()
+
         if choice == "cancel":
             return None
+
         if choice.isdigit():
             index = int(choice) - 1
             if 0 <= index < len(results):
                 return results[index]
-        else:    
-            print("Invalid selection. Please enter a valid number or 'cancel'.")
+
+        print("Invalid selection. Please enter a valid number or 'cancel'.")
+
