@@ -1,7 +1,7 @@
 from ollama_client.api_client import OllamaClient
 from rich.markdown import Markdown
 
-async def stream_chat_response(user_input, model, host, show_thinking, history, live):
+async def stream_chat_response(user_input, model, host, config, show_thinking, history, live):
     """
     Fetches and streams AI responses.
     """
@@ -11,7 +11,7 @@ async def stream_chat_response(user_input, model, host, show_thinking, history, 
     history.append({'role': 'user', 'content': user_input})
 
     response = ""
-    stream = await client.chat(model=model, messages=history, stream=True)
+    stream = await client.chat(model=model, config=config, messages=history, stream=True)
 
     async for chunk in stream:
         message = chunk['message']['content']

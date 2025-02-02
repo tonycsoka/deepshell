@@ -7,19 +7,19 @@ import sys
 
 console = Console()
 
-async def start_chat(model, host, show_thinking, user_input, file_content):
+async def start_chat(model, host, config, show_thinking, user_input, file_content):
     print(f"Chat mode activated with model: {model} on {host}. Type 'exit' to quit.\n")
-
+    default_config = config
     history = [] 
     
     if not file_content and user_input:
-        file_content = commands_handler(user_input)
+        file_content, new_config = commands_handler(user_input)
+        if new_config:
+            config = new_config
 
     user_input = process_input(user_input, file_content)
 
     while True:
-        
-
         # If no user input was passed (either empty or from file), attempt to get input
         if user_input=="":
             if sys.stdin.isatty():
@@ -32,22 +32,28 @@ async def start_chat(model, host, show_thinking, user_input, file_content):
 
                 if user_input.lower() == 'exit':
                     break
-
                 if not file_content and user_input:
-                    user_input = process_input (user_input, commands_handler(user_input))
-                    #TODO split command to file and prompt
-                
+                    file_content, new_config = commands_handler(user_input)
+                    if new_config:
+                        config = new_config
+                        if config == default_config:
+                            user_input = ""
+                            continue
 
+                if user_input=="":
+                   continue
+                else:
+                    user_input = process_input (user_input, file_content)
             else:
                 # If input is coming from a pipe, exit or wait for more
                 break
 
         history.append({"role": "user", "content": user_input})  # Add to history for use in the session
         with Live(console=console, refresh_per_second=30, vertical_overflow="ellipsis") as live:
-            response = await stream_chat_response(user_input, model, host, show_thinking, history, live)
+            response = await stream_chat_response(user_input, model, host, config, show_thinking, history, live)
             render_response(response, live)
             history.append({"role": "assistant", "content": response})
             user_input = ""
-            file_content = "" 
+            file_content = ""
         print()  # Add a newline after the response to ensure clean output
 

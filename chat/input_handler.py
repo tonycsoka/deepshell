@@ -1,4 +1,6 @@
 import os
+
+from config.settings import DEFAULT_CONFIG, CODE_CONFIG, SHELL_CONFIG
 from utils.file_utils import read_file, read_folder
 
 
@@ -23,7 +25,21 @@ def commands_handler(user_input):
     Splits commands using 'and' for additional processing.
     """
     user_input = user_input.strip().lower()
+    config_name = DEFAULT_CONFIG
 
+    if any(keyword in user_input for keyword in ["generate code", "generate script", "generate bash script"]):
+        print("switching to coding mode")
+        return user_input, CODE_CONFIG
+
+    elif "shell command" in user_input:
+        print("switching to shell generator mode")
+        return user_input, SHELL_CONFIG
+
+    elif any(keyword in user_input for keyword in ["default mode", "default config"]):
+        print("switching to default mode")
+        return None, DEFAULT_CONFIG
+
+        
     # Check if "and" exists to split the command into two parts
     main_input, additional_action = (user_input.split("and", 1) + [""])[:2]
     main_input, additional_action = main_input.strip(), additional_action.strip()
@@ -33,12 +49,13 @@ def commands_handler(user_input):
     tokens = main_input.split()
 
     if not tokens:
-        return None  # No valid command found
+        return None, None # No valid command found
 
     # Check for action word in the input
     action = next((word for word in tokens if word in action_words), None)
     if not action:
-        return None  # No recognized command found
+        return None, None
+    # No recognized command found
 
     # Determine the target (file/folder name)
     target_index = tokens.index(action) + 1
@@ -53,6 +70,6 @@ def commands_handler(user_input):
 
     # If file/folder content is found and there's an additional action, process it
     if file_content and additional_action:
-        return process_input(additional_action, file_content)
+        return process_input(additional_action, file_content), None
 
-    return file_content
+    return file_content, None

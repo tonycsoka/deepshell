@@ -1,7 +1,7 @@
 import argparse
 import asyncio
 import sys
-from config.settings import DEFAULT_MODEL, DEFAULT_HOST
+from config.settings import DEFAULT_CONFIG, DEFAULT_HOST, DEFAULT_MODEL
 from chat.chat_manager import start_chat
 from utils.symlink_utils import create_symlink, remove_symlink
 from utils.file_utils import read_file
@@ -45,6 +45,7 @@ async def main():
     await start_chat(
         model=args.model,
         host=args.host,
+        config = DEFAULT_CONFIG,
         show_thinking=args.thinking,
         user_input=user_input,
         file_content=file_content,
