@@ -1,49 +1,47 @@
-from rich.console import Console
-from rich.live import Live
 from chat.input_handler import CommandProcessor
-from chat.output_renderer import render_response
-from ollama_client.stream_handler import stream_chat_response
+from chat.stream_handler import StreamHandler
 
-console = Console()
+async def start_chat(ollama_client, user_input="", file_content=None):
+    stream_handler = StreamHandler(ollama_client)
+    render_response = stream_handler.render_response# Create StreamHandler instance
+    render_response(f"Chat mode activated with model: {ollama_client.model} on {ollama_client.host}. Type 'exit' to quit.\n")
 
-async def start_chat(model, host, config, show_thinking, user_input="", file_content=None):
-    print(f"Chat mode activated with model: {model} on {host}. Type 'exit' to quit.\n")
-    default_config = config
-    command_processor = CommandProcessor(default_config=config)
-    history = []
+    default_config = ollama_client.config
+    command_processor = CommandProcessor(default_config)
+    history = ollama_client.history
 
     # Process file/folder commands at startup
     if user_input and not file_content:
-        file_content = command_processor.process_file_or_folder(user_input)  # Ensure file content is retrieved
+        file_content = command_processor.process_file_or_folder(user_input)
     user_input = command_processor.handle_command(user_input)
-    user_input = command_processor.format_input(user_input,file_content)
-    if command_processor.config != config:
-        config = command_processor.config
+    user_input = command_processor.format_input(user_input, file_content)
+    if command_processor.config != ollama_client.config:
+        ollama_client.config = command_processor.config
 
     while True:
-        # Get user input (interactive or piped)
         if user_input == "":
             user_input = command_processor.get_user_input()
             if user_input:
-                file_content = command_processor.process_file_or_folder(user_input)  # Ensure file content is retrieved
-                user_input = command_processor.handle_command(user_input)           
+                file_content = command_processor.process_file_or_folder(user_input)
+                user_input = command_processor.handle_command(user_input)
 
         if user_input == "exit":
-            print("Exiting chat.")
-            break  
-        user_input = command_processor.format_input(user_input,file_content)
-        if command_processor.config != config and command_processor.config == default_config:
+            render_response("Exiting chat.")
+            break 
+
+        user_input = command_processor.format_input(user_input, file_content)
+        if command_processor.config != ollama_client.config and command_processor.config == default_config:
             continue
-        elif command_processor.config != config:
-            config = command_processor.config
+        elif command_processor.config != ollama_client.config:
+            ollama_client.config = command_processor.config
 
         history.append({"role": "user", "content": user_input})
-
-        with Live(console=console, refresh_per_second=30, vertical_overflow="ellipsis") as live:
-            response = await stream_chat_response(user_input, model, host, config, show_thinking, history, live)
-            render_response(response, live)
-            history.append({"role": "assistant", "content": response})
+        
+        # Get the response from StreamHandler (this will also handle live updates)
+        response = await stream_handler.stream_chat_response(history)
+        stream_handler.render_response(response)  # Render the final response as a complete message
+        history.append({"role": "assistant", "content": response})
 
         user_input = ""
         file_content = ""
-
+        ollama_client.history = history

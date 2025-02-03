@@ -1,6 +1,5 @@
 import os
 
-
 def read_file(file_path):
     """
     Reads content from a file or lists and reads files in a folder.
@@ -62,8 +61,6 @@ def read_folder(folder_path):
 
     except PermissionError:
         return f"Error: Permission denied to access '{folder_path}'."
-      
-import os
 
 def prompt_search(missing_path):
     """

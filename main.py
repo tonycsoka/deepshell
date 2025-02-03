@@ -5,6 +5,7 @@ from config.settings import DEFAULT_CONFIG, DEFAULT_HOST, DEFAULT_MODEL
 from chat.chat_manager import start_chat
 from utils.symlink_utils import create_symlink, remove_symlink
 from utils.file_utils import read_file
+from ollama_client.api_client import OllamaClient
 
 async def main():
     parser = argparse.ArgumentParser(description="Ollama Chat Mode") 
@@ -42,11 +43,17 @@ async def main():
         # If no --prompt flag is provided, use the optional string_input
         user_input = args.string_input
 
+    ollama_client = OllamaClient(
+            host=args.host,
+            model=args.model,
+            config= DEFAULT_CONFIG,
+            stream = True,
+            show_thinking = args.thinking 
+            )
+
+
     await start_chat(
-        model=args.model,
-        host=args.host,
-        config = DEFAULT_CONFIG,
-        show_thinking=args.thinking,
+        ollama_client,
         user_input=user_input,
         file_content=file_content,
     )

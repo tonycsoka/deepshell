@@ -1,12 +1,27 @@
 from ollama import AsyncClient
+from config.settings import DEFAULT_CONFIG, DEFAULT_MODEL, DEFAULT_HOST
 
 class OllamaClient:
-    def __init__(self, host):
+    def __init__(self, host=DEFAULT_HOST, model=DEFAULT_MODEL, config=DEFAULT_CONFIG, stream=True, show_thinking=False):
+        """
+        Initializes the OllamaClient for chat interactions.
+        """
         self.client = AsyncClient(host=host)
+        self.host = host
+        self.model = model
+        self.config = config
+        self.stream = stream
+        self.show_thinking = show_thinking
+        self.history = []
 
-    async def chat(self, model, messages, config, stream=True):
+    async def chat(self,user_input):
         """
-        Sends a chat request to the Ollama API.
+        Sends a chat request and streams the response.
         """
+        return await self.client.chat(
+                model=self.model,
+                messages=user_input,
+                options=self.config,
+                stream=self.stream
+            )
 
-        return await self.client.chat(model=model, messages=messages, options=config, stream=stream)
