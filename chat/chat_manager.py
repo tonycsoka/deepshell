@@ -20,7 +20,7 @@ async def start_chat(ollama_client, user_input="", file_content=None):
 
     while True:
         if user_input == "":
-            user_input = command_processor.get_user_input()
+            user_input = await command_processor.get_user_input()
             if user_input:
                 file_content = command_processor.process_file_or_folder(user_input)
                 user_input = command_processor.handle_command(user_input)
@@ -39,7 +39,6 @@ async def start_chat(ollama_client, user_input="", file_content=None):
         
         # Get the response from StreamHandler (this will also handle live updates)
         response = await stream_handler.stream_chat_response(history)
-        stream_handler.render_response(response)  # Render the final response as a complete message
         history.append({"role": "assistant", "content": response})
 
         user_input = ""

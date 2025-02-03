@@ -21,7 +21,7 @@ DeepSeek-Shell is a command-line tool for interacting with AI models via the Oll
 **Install the necessary dependencies using pip:**
 
 ```
-pip install ollama rich
+pip install ollama rich prompt_toolkit
 ```
 
 **To access the script globally from the terminal, create a symlink:**
