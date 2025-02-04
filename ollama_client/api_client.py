@@ -12,6 +12,7 @@ class OllamaClient:
         self.config = config
         self.stream = stream
         self.show_thinking = show_thinking
+        self.thoughts_buffer = []
         self.history = []
 
     async def chat(self,user_input):
