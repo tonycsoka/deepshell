@@ -1,9 +1,10 @@
-from chat.input_handler import CommandProcessor
+from chat.input_handler import get_user_input
+from chat.input_handler import CommandProcessor 
 from chat.stream_handler import StreamHandler
 
 async def start_chat(ollama_client, user_input="", file_content=None):
     stream_handler = StreamHandler(ollama_client)
-    render_response = stream_handler.render_response# Create StreamHandler instance
+    render_response = stream_handler.render_response # Create StreamHandler instance
     render_response(f"Chat mode activated with model: {ollama_client.model} on {ollama_client.host}. Type 'exit' to quit.\n")
 
     default_config = ollama_client.config
@@ -20,7 +21,7 @@ async def start_chat(ollama_client, user_input="", file_content=None):
 
     while True:
         if user_input == "":
-            user_input = await command_processor.get_user_input()
+            user_input = await get_user_input()
             if user_input:
                 file_content = command_processor.process_file_or_folder(user_input)
                 user_input = command_processor.handle_command(user_input)

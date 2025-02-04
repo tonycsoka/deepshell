@@ -5,6 +5,31 @@ from config.settings import DEFAULT_CONFIG, CODE_CONFIG, SHELL_CONFIG
 from utils.file_utils import read_file, read_folder
 from prompt_toolkit import PromptSession
 
+async def get_user_input(prompt="You: "):
+    """
+    Handles interactive user input using prompt_toolkit asynchronously.
+    In piped mode, it falls back to sys.stdin.read().
+    """
+    # If interactive mode is available:
+    if sys.stdin.isatty():
+        session = PromptSession()
+        try:    
+            user_input = await session.prompt_async(prompt)
+            user_input = user_input.strip()
+            if user_input.lower() == "exit":
+                return "exit"
+            return user_input
+        except KeyboardInterrupt:
+            print("\nExiting chat.")
+            return "exit"
+    else:
+        # In piped mode, read all input from stdin
+        try:
+            user_input = sys.stdin.read().strip()
+            return user_input if user_input else "exit"
+        except EOFError:
+            return "exit"
+
 class CommandProcessor:
     """Handles user input, command processing, mode switching, and file handling."""
 
@@ -82,27 +107,4 @@ class CommandProcessor:
             return formatted_content
         return user_input
 
-    async def get_user_input(self):
-        """
-        Handles interactive user input using prompt_toolkit asynchronously.
-        In piped mode, it falls back to sys.stdin.read().
-        """
-        # If interactive mode is available:
-        if sys.stdin.isatty():
-            session = PromptSession()
-            try:
-                user_input = await session.prompt_async("You: ")
-                user_input = user_input.strip()
-                if user_input.lower() == "exit":
-                    return "exit"
-                return user_input
-            except KeyboardInterrupt:
-                print("\nExiting chat.")
-                return "exit"
-        else:
-            # In piped mode, read all input from stdin
-            try:
-                user_input = sys.stdin.read().strip()
-                return user_input if user_input else "exit"
-            except EOFError:
-                return "exit"
+
