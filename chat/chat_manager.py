@@ -8,7 +8,7 @@ async def start_chat(ollama_client, user_input="", file_content=None):
     render_response(f"Chat mode activated with model: {ollama_client.model} on {ollama_client.host}. Type 'exit' to quit.\n")
 
     default_config = ollama_client.config
-    command_processor = CommandProcessor(default_config)
+    command_processor = CommandProcessor(ollama_client)
     history = ollama_client.history
 
     # Process file/folder commands at startup

@@ -10,10 +10,9 @@ async def get_user_input(prompt="You: "):
     Handles interactive user input using prompt_toolkit asynchronously.
     In piped mode, it falls back to sys.stdin.read().
     """
-    # If interactive mode is available:
     if sys.stdin.isatty():
         session = PromptSession()
-        try:    
+        try:
             user_input = await session.prompt_async(prompt)
             user_input = user_input.strip()
             if user_input.lower() == "exit":
@@ -23,7 +22,6 @@ async def get_user_input(prompt="You: "):
             print("\nExiting chat.")
             return "exit"
     else:
-        # In piped mode, read all input from stdin
         try:
             user_input = sys.stdin.read().strip()
             return user_input if user_input else "exit"
@@ -44,25 +42,51 @@ class CommandProcessor:
 
     ACTION_WORDS = {"find", "open", "read"}
 
-    def __init__(self, default_config):
-        self.default_config = default_config
-        self.config = default_config
+    def __init__(self, ollama_client):
+        self.ollama_client = ollama_client
+        self.default_config = ollama_client.config
+        self.config = ollama_client.config
 
     def handle_command(self, user_input):
         """Processes commands and updates config accordingly."""
         if user_input:
+            # Check if thinking mode should be enabled/disabled
+            if self.handle_thinking_commands(user_input):
+                return None  # Block sending this input to the chatbot
+
             new_config = self.detect_mode_switch(user_input)
             if new_config:
                 if new_config == DEFAULT_CONFIG:
-                    return ""  # Reset input only after switching to default mode
+                    return None  # Reset input only after switching to default mode
                 return user_input
+
         return user_input
+
+    def handle_thinking_commands(self, user_input):
+        """Detects commands to enable or disable thinking mode."""
+        thinking_keywords = {"enable thinking"}
+        disable_thinking_keywords = {"disable thinking"}
+
+        if any(keyword == user_input.lower() for keyword in thinking_keywords):
+            if not self.ollama_client.show_thinking:
+                self.ollama_client.show_thinking = True
+                print("Thinking mode enabled.")
+            return True  # Block input from being sent to the chatbot
+
+        if any(keyword == user_input.lower() for keyword in disable_thinking_keywords):
+            if self.ollama_client.show_thinking:
+                self.ollama_client.show_thinking = False
+                print("Thinking mode disabled.")
+            else:
+                print("Thinking mode is already disabled.")
+            return True  # Block input
+
+        return False  # No action taken, allow input to pass
 
     def detect_mode_switch(self, user_input):
         """Detects mode switching commands and updates config."""
         for keyword, config in self.MODE_COMMANDS.items():
             if keyword in user_input:
-                # Instead of printing the entire config, we print the keyword as the mode name.
                 print(f"Switching to {keyword} mode")
                 self.config = config
                 return config
@@ -70,7 +94,7 @@ class CommandProcessor:
 
     def process_file_or_folder(self, user_input):
         """Handles file or folder operations (find, read, open)."""
-        file_content = None  # Always initialize file_content
+        file_content = None  
 
         parts = re.split(r"\band\b", user_input, maxsplit=1)
         main_command = parts[0].strip()
@@ -106,5 +130,3 @@ class CommandProcessor:
                 return f"Prompt:\n{user_input}\n\n{formatted_content}"
             return formatted_content
         return user_input
-
-

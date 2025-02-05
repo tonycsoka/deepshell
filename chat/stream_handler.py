@@ -65,7 +65,7 @@ class StreamHandler:
                         first_chunk = False  # Disable for future chunks
 
                     response += message
-                    live.update(Markdown(response))
+                    live.update(Markdown(response))  # Update the live display after every response chunk
 
             return response
         else:
@@ -106,12 +106,10 @@ class StreamHandler:
 
             return response
 
-
     def render_response(self, response):
         """
         Renders the response in a formatted way using Rich.
         Updates the response live in the terminal.
         """
-        # Display the response using live update (if not streaming)
         with Live(Markdown(response), console=self.console, refresh_per_second=self.refresh_per_second, vertical_overflow="ellipsis") as live:
             live.update(Markdown(response))
