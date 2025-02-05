@@ -3,14 +3,13 @@ from rich.live import Live
 from rich.markdown import Markdown
 
 class StreamHandler:
-    def __init__(self, ollama_client, console=None, refresh_per_second=10):
+    def __init__(self, ollama_client, show_output=True):
         """
         Initializes the StreamHandler.
         """
         self.client = ollama_client
-        self.console = console or Console()
-        self.refresh_per_second = refresh_per_second
-        self.show_output = True
+        self.console = Console()
+        self.show_output = show_output 
         self.thoughts_buffer = self.client.thoughts_buffer
 
     async def stream_chat_response(self, user_input):
@@ -26,7 +25,7 @@ class StreamHandler:
         stream = await self.client.chat(user_input)
 
         if self.show_output:
-            with Live(Markdown(""), console=self.console, refresh_per_second=self.refresh_per_second, vertical_overflow="ellipsis") as live:
+            with Live(Markdown(""), console=self.console, refresh_per_second=10, vertical_overflow="ellipsis") as live:
                 async for chunk in stream:
                     message = chunk.get('message', {}).get('content', '')
 
@@ -111,5 +110,5 @@ class StreamHandler:
         Renders the response in a formatted way using Rich.
         Updates the response live in the terminal.
         """
-        with Live(Markdown(response), console=self.console, refresh_per_second=self.refresh_per_second, vertical_overflow="ellipsis") as live:
+        with Live(Markdown(response), console=self.console, refresh_per_second=10, vertical_overflow="ellipsis") as live:
             live.update(Markdown(response))

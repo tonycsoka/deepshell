@@ -1,8 +1,9 @@
 from ollama import AsyncClient
-from config.settings import DEFAULT_CONFIG, DEFAULT_MODEL, DEFAULT_HOST
+from config.settings import DEFAULT_MODEL, DEFAULT_HOST
+from config.settings import generate_config
 
 class OllamaClient:
-    def __init__(self, host=DEFAULT_HOST, model=DEFAULT_MODEL, config=DEFAULT_CONFIG, stream=True, show_thinking=False):
+    def __init__(self, host=DEFAULT_HOST, model=DEFAULT_MODEL, config=generate_config(), stream=True, show_thinking=False):
         """
         Initializes the OllamaClient for chat interactions.
         """

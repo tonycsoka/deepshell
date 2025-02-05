@@ -1,7 +1,8 @@
 import argparse
 import asyncio
 import sys
-from config.settings import DEFAULT_CONFIG, DEFAULT_HOST, DEFAULT_MODEL
+from config.settings import generate_config
+from config.settings import DEFAULT_HOST, DEFAULT_MODEL
 from chat.chat_manager import start_chat
 from utils.symlink_utils import create_symlink, remove_symlink
 from utils.file_utils import read_file
@@ -46,7 +47,7 @@ async def main():
     ollama_client = OllamaClient(
             host=args.host,
             model=args.model,
-            config= DEFAULT_CONFIG,
+            config= generate_config(),
             stream = True,
             show_thinking = args.thinking 
             )

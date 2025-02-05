@@ -1,7 +1,8 @@
 import os
 import re
 import sys
-from config.settings import DEFAULT_CONFIG, CODE_CONFIG, SHELL_CONFIG
+from config.settings import generate_config
+from config.settings import DEFAULT, SHELL, CODE
 from utils.file_utils import read_file, read_folder
 from prompt_toolkit import PromptSession
 
@@ -30,6 +31,9 @@ async def get_user_input(prompt="You: "):
 
 class CommandProcessor:
     """Handles user input, command processing, mode switching, and file handling."""
+    DEFAULT_CONFIG = generate_config(temp=0.6, prompt=DEFAULT)
+    CODE_CONFIG = generate_config(temp=0.5, prompt=CODE)
+    SHELL_CONFIG = generate_config(temp=0.4, prompt=SHELL)
 
     MODE_COMMANDS = {
         "generate code": CODE_CONFIG,
@@ -56,7 +60,7 @@ class CommandProcessor:
 
             new_config = self.detect_mode_switch(user_input)
             if new_config:
-                if new_config == DEFAULT_CONFIG:
+                if new_config == self.default_config:
                     return None  # Reset input only after switching to default mode
                 return user_input
 
