@@ -1,43 +1,11 @@
-import platform
+import sys
+from config.system_prompts import DEFAULT,CODE,SHELL
+from ollama_client.api_client import OllamaClient
+
 
 #Settings
 DEFAULT_MODEL = "deepseek-r1:14b"
 DEFAULT_HOST = "http://localhost:11434"
-
-#Model Configs
-DEFAULT = f"""
-You are an expert in computer science and system administration, ready to assist with a variety of tasks. Your expertise spans terminal usage, programming across   
-multiple languages, and system administration responsibilities such as server management and scripting.                                                             
-When providing assistance:
-- Ensure that answers are relevant for the {platform.uname()}
-- Terminal Usage: Offer guidance on navigating the command line, using tools, and executing commands.
-- Programming: Help with coding in various languages, debugging, and best practices.
-- System Administration: Assist with managing servers, security, networking, and system optimization. 
-- Speak English only, unless instructed otherwise
-"""
-
-SHELL = f"""
-You are a shell command generator only. Your sole purpose is to output shell commands in response to user requests.  
-Do not include explanations, examples beyond the command itself, or any additional text.  
-Ensure that answers are relevant for the {platform.uname()} system.  
-
-Guidelines:  
-- Keep responses brief and focused solely on the shell command.  
-- Avoid offering alternatives, suggestions, or extra information.  
-- If asked about system updates, respond with exactly 'sudo apt update && sudo apt upgrade -y'.  
-- Speak English only, unless instructed otherwise.  
-"""
-
-CODE = f"""
-You are a code generator. Your sole purpose is to generate precise and concise code snippets in response to user requests.  
-Do not include explanations, examples beyond the code itself, or any additional text.  
-Ensure that answers are relevant for the {platform.uname()} system.  
-
-Guidelines:  
-- Provide only the necessary code when requested.  
-- Avoid extra information, explanations, or alternative suggestions.  
-- Speak English only, unless instructed otherwise.  
-"""
 
 
 def generate_config(temp=0.7,prompt=DEFAULT):
@@ -46,3 +14,46 @@ def generate_config(temp=0.7,prompt=DEFAULT):
             "system": prompt,
     }
     return config
+
+def generate_helper_config(supported_actions=["open","find","play"]) :
+    
+    system_prompt = f"""
+    You are an AI that extracts user intent and target from messages.
+    Your response must be in JSON format:
+    {{"intent": "open file", "target": "config.json"}}
+
+    Supported actions:
+    - {', '.join(supported_actions)}
+
+    If none of the actions were detected:
+    - reply "None"
+
+    """
+    return generate_config(temp=0.6, prompt=system_prompt)
+
+DEFAULT_CONFIG = generate_config(temp=0.6, prompt=DEFAULT)
+CODE_CONFIG = generate_config(temp=0.5, prompt=CODE)
+SHELL_CONFIG = generate_config(temp=0.4, prompt=SHELL)
+
+def deploy_client(args):
+
+    if args.shell:
+        config = SHELL_CONFIG
+        config_name = "shell"
+    elif args.code: 
+        config = CODE_CONFIG
+        config_name = "code"
+    else:
+        config = DEFAULT_CONFIG
+        config_name = "default"
+
+    ollama_client = OllamaClient(
+        host=args.host,
+        model=args.model,
+        config=config,
+        config_name=config_name,
+        stream=True,
+        render_output= not sys.stdout.isatty(),
+        show_thinking=args.thinking
+    )
+    return ollama_client
