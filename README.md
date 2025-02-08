@@ -1,144 +1,86 @@
 # DeepSeek-Shell
 
-DeepSeek-Shell is a command-line tool for interacting with AI models via the Ollama API. It supports both user input through prompts and content from files or piped input. An alternative to Shell-GPT, it works with locally running deepseek-r1 models.
+_A whisper in the void, a tool forged in silence._ DeepSeek-Shell is your clandestine terminal companion, bridging the gap between human intent and AI execution. It speaks in commands, listens in context, and acts with precision. DeepSeek-Shell operates with local deepseek-r1 models, ensuring autonomy beyond the reach of prying eyes.
 
-### Features
+## Features
 
-- Terminal-based interface
-- Real-time chat with the AI model
-- Filtering out thinking process by default
-- Streamed responses with markdown formatting
-- Support for reading files and folders
-- Advanced command handling: Open files, folders, and execute subsequent actions (e.g., `analyze the code`)
+- **Silent Precision** – Filters out unnecessary thoughts, leaving only clean responses.
+- **Markdown-Enhanced Streaming** – Responses are streamed in markdown for clarity.
+- **Intelligent File Handling** – Read, analyze, and act on files or entire directories asynchronously.
+- **Advanced Command Parsing** – Detects natural instructions like _"open this folder and analyze the code"_.
+- **Real-Time AI Interaction** – A dialogue system built for seamless terminal operation.
+- **Asynchronous File Handling** – Ensures smooth reading and processing of large files without blocking execution.
+- **Full Folder Analysis** – Reads, structures, and interprets entire directories, making sense of extensive codebases or logs.
 
-### Requirements
+## Installation
 
-- Python 3.7 or higher
-- Ollama package for interacting with the AI and installed models
+**Ensure DeepSeek-r1 is within your grasp:**
 
-### Installation
-
-**Make sure you have Ollama up and running with DeepSeek-r1**
-
-```
+```sh
 curl -fsSL https://ollama.com/install.sh | sh
-
 ollama pull deepseek-r1:14b
-
 ollama serve
 ```
-**Install the necessary dependencies using pip:**
 
-```
+**Prepare the tool:**
+
+```sh
 pip install ollama rich prompt_toolkit aiofiles 
 ```
 
-**To access the script globally from the terminal, create a symlink:**
+**Integrate it into your system:**
 
-```
+```sh
 chmod +x deepshell
 ./deepshell --install
 ```
 
-This creates a symlink to `deepshell` in `~/.local/bin`, making it globally accessible.
+This binds DeepSeek-Shell to your system, making it accessible from anywhere.
 
-### Usage
+## Configuration
 
-**Running the Chat**
+DeepSeek-Shell relies on settings defined in `config/settings.py`. Here, you can modify default parameters such as AI models, API hosts, and temperature settings for responses. Editing this file allows for customization tailored to your specific workflow and system environment.
 
-To start the chat mode, simply execute the script:
+## Usage
 
+**Summon the AI:**
+
+```sh
+deepseek
 ```
-deepshell
-```
 
-Or, if you haven't installed it:
+or, for the uninitiated:
 
-```
+```sh
 python3 main.py
 ```
 
-**Command-Line Arguments**
-:
-Specify additional arguments to customize the behavior:
+**Command Modes:**
 
-- `--model`: The AI model to use (defaults to `DEFAULT_MODEL`).
-- `--host`: The Ollama API host (defaults to `DEFAULT_HOST`).
-- `--thinking`: Show the AI's thinking process (useful for debugging or understanding).
-- `--prompt`: Provide the initial message to start the conversation.
-- `--file`: Specify a file to include in the chat.
-- `--code`: Outputs code only
-- `--shell`: Generates shell commands
+- `--model` - Define which entity answers.
+- `--host` - Set the host of your digital oracle.
+- `--thinking` - Unveil the process behind the response.
+- `--prompt` - Seed the conversation with a thought.
+- `--file` - Offer a document for scrutiny.
+- `--code` - Extract and generate precise code snippets based on context.
+- `--shell` - Generate shell commands, execute them, and analyze the output.
 
-**Pipe Support**
+**Piping the Shadows:**
 
-You can pipe input to DeepSeek-Shell:
-
-```
-cat input.txt | deepshell  "Analyze the content"
+```sh
+cat input.txt | deepshell "Analyze the content"
 ```
 
-Currently, piping will not start a chat session, but you can use it to pass content to the tool.
+**Delving into Folders:**
 
-**File Support**
-
-You can specify a file directly using the `--file` flag:
-
-```
-deepshell --file "input.txt" --prompt "Analyze the content"
+```sh
+deepseek "open this folder"
 ```
 
-This will start an interactive chat session with the file content provided as context. You can continue the conversation by typing additional prompts after the initial file content is processed.
+**Merging Inquiry and Action:**
 
-**Folder Support**
-
-You can open and read a folder’s contents using the following command:
-
-```
-deepshell "open this folder"
+```sh
+deepseek "open this folder and analyze the code"
 ```
 
-This will read the contents of the current folder, and you can continue with other commands based on the folder’s structure.
-
-**Advanced Command Parsing**
-
-DeepSeek-Shell allows you to read files or folders and then perform additional actions in the same command. For example, you can read a file and analyze the content using the `"and"` command:
-
-```
-deepshell "open this folder and analyze the code"
-```
-
-In this case, the tool will:
-1. Open and read the content of current folder, including the content of files.
-2. Perform the action `"analyze the code"` on the content, which will be handled by the AI model.
-
-Also you can naturally ask to open file or a folder while in chat:
-```
-$ deepshell
-Chat mode activated with model: deepseek-r1:14b on http://localhost:11434. Type 'exit' to quit.
-
-You: open LICENSE and translate it to Chinese
-Reading file LICENSE:
-许可协议： MIT License
-
-版权信息： 版权所有 (c) catoni0
-
-特此授权，免费授予任何获得本软件及其相关文档文件副本的人（“软件”），无限制地处理该软件，包括但不限于使用、复制、修改、合
-并、发布、分发、 sublicense 和/或出售软件副本的权限，并允许向其提供的人员也这样做，但需遵守以下条件：
-...
-
-```
-
-### Settings
-
-The settings for the AI model and host are located in `config/settings.py`.
-
-```python
-# config/settings.py
-
-# Default AI model
-DEFAULT_MODEL = "deepseek-r1:14b"
-
-# Default Ollama API host
-DEFAULT_HOST = "http://localhost:11434"
-```
+_A precision tool in a chaotic world. Your words, its execution._
