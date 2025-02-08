@@ -1,8 +1,11 @@
 import os
+from sre_compile import NOT_LITERAL_LOC_IGNORE
 import sys
 import aiofiles
 import asyncio
-from chat.streamer import rich_print 
+from chat.streamer import rich_print
+
+
 class FileUtils:
     def __init__(self, ignore_files=None, ignore_folders=None, scan_dot_folders=False):
         """
@@ -30,7 +33,8 @@ class FileUtils:
 
     async def read_file(self, file_path, root_folder=None):
         """Asynchronously reads content from a file, skipping ignored files."""
-        await rich_print(f"Reading {file_path}") 
+        if not root_folder:
+            await rich_print(f"Reading {file_path}") 
         try:
             if any(file_path.endswith(ext) for ext in self.ignore_files):
                 return f"Skipping file (ignored): {file_path}"
@@ -38,13 +42,12 @@ class FileUtils:
             relative_path = os.path.relpath(file_path, root_folder) if root_folder else file_path
             
             async with aiofiles.open(file_path, 'r', encoding="utf-8", errors="ignore") as file:
-                return f"--- {relative_path} ---\n" + await file.read()
+                return f"--------- {relative_path} ---------\n" + await file.read()
         except Exception as e:
             return f"Error reading file {file_path}: {e}"
 
     async def generate_structure(self, folder_path, root_folder, prefix=""):
         """Generates a textual representation of the folder structure."""
-        await rich_print(f"Generating structure for {folder_path}")
         structure = f"{prefix}{os.path.basename(folder_path)}/\n"
         items = sorted(os.listdir(folder_path))
         
@@ -65,6 +68,7 @@ class FileUtils:
             root_folder = folder_path
         
         try:
+            await rich_print(f"Generating structure for {folder_path}")
             structure = await self.generate_structure(folder_path, root_folder)
             file_contents = "\n\n### File Contents ###\n"
             
@@ -83,3 +87,23 @@ class FileUtils:
         except PermissionError:
             return f"Error: Permission denied to access '{folder_path}'."
 
+    async def search_files(self, missing_path, search_dir=None, max_results=10):
+        """
+        Searches for a missing file or folder in the specified directory.
+        Defaults to the home directory if none is provided.
+        """
+        if not search_dir:
+            search_dir = os.path.expanduser("~")
+
+        results = []
+        for root, dirs, files in os.walk(search_dir):
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            files = [f for f in files if not f.startswith(".")]
+
+            for name in files + dirs:
+                if missing_path.lower() in name.lower():
+                    results.append(os.path.join(root, name))
+                    if len(results) >= max_results:
+                        return results  # Stop searching if max results reached
+
+        return results

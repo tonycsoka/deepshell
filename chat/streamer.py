@@ -6,7 +6,6 @@ from rich.console import Console
 
 console = Console()
 
-
 async def rich_print(content):
     """
     Custom print function that handles both live-streaming (async generator) 
@@ -20,14 +19,14 @@ async def rich_print(content):
                     for char in chunk: 
                         displayed_text += char
                         live.update(Markdown(displayed_text), refresh=True)
-                        await asyncio.sleep(0.02)
+                        await asyncio.sleep(0.01)
     else:
         displayed_text = ""
         with Live("", console=console, refresh_per_second=10) as live:
             for char in content:  
                 displayed_text += char
                 live.update(Markdown(displayed_text), refresh=True)
-                await asyncio.sleep(0.02)
+                await asyncio.sleep(0.01)
 
 
 async def thinking_animation():

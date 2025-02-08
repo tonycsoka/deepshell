@@ -1,7 +1,7 @@
 import os
 import re
 from utils.file_utils import FileUtils
-from chat.user_input import prompt_search
+from chat.user_input import UIManager
 
 class CommandProcessor:
     """Handles user input"""
@@ -10,7 +10,8 @@ class CommandProcessor:
         self.ollama_client = ollama_client
         self.default_config = ollama_client.config
         self.config = ollama_client.config
-
+        self.prompt_search = UIManager.prompt_search
+    
     async def handle_command(self, user_input):
         """Processes commands, handles file/folder operations, and updates config."""
         if user_input:
@@ -65,7 +66,7 @@ class CommandProcessor:
 
     async def _run_search(self, target):
         """Run the search without using asyncio.run()."""
-        return await prompt_search(target)
+        return await ui.prompt_search(target)
 
     def format_input(self, user_input, file_content, additional_action=None):
         """Prepares user input by combining prompt and file content."""
