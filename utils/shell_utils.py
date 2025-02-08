@@ -14,7 +14,7 @@ class CommandExecutor:
 
         require_sudo = command.startswith("sudo")
         if require_sudo and not sudo_password:
-            sudo_password = await get_user_input("Enter sudo password: ", is_password=True)
+            sudo_password = await self.get_user_input("Enter sudo password: ", is_password=True)
             command = f"echo {sudo_password} | sudo -S {command[5:]}" 
         proc = await asyncio.create_subprocess_shell(
             command,
