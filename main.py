@@ -3,8 +3,7 @@ import sys
 from config.settings import deploy_client
 from chat.manager import start_chat
 from utils.symlink_utils import create_symlink, remove_symlink
-from utils.file_utils import read_pipe
-from ollama_client.api_client import OllamaClient
+from utils.file_utils import FileUtils
 from utils.args_utils import parse_args 
 from chat.input_handler import CommandProcessor
 
@@ -18,16 +17,15 @@ async def main():
     if args.uninstall:
         remove_symlink()
         return
-
+    file_utils = FileUtils()
     ollama_client = deploy_client(args)
     command_processor = CommandProcessor(ollama_client)
-
     user_input = args.prompt or args.string_input or ""
     # Prioritize file argument over piped input.
     if args.file:
         file_content = await command_processor.process_file_or_folder(args.file)
     elif not sys.stdin.isatty():
-        file_content =  await read_pipe()
+        file_content =  await file_utils.read_pipe()
     else:
         file_content = None
    

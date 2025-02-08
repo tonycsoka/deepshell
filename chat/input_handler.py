@@ -1,14 +1,11 @@
 import os
 import re
-from config.settings import DEFAULT_CONFIG, CODE_CONFIG, SHELL_CONFIG
-from utils.file_utils import read_file, read_folder
+from utils.file_utils import FileUtils
 from chat.user_input import prompt_search
 
 class CommandProcessor:
     """Handles user input"""
-
     
-
     def __init__(self, ollama_client):
         self.ollama_client = ollama_client
         self.default_config = ollama_client.config
@@ -22,6 +19,9 @@ class CommandProcessor:
                 file_content = await self.process_file_or_folder(target)
                 if file_content:
                     return self.format_input(user_input, file_content, additional_action)
+            else:
+                if additional_action == "cancel":
+                    return None
 
         return user_input
 
@@ -46,16 +46,19 @@ class CommandProcessor:
             target = os.getcwd()
         elif not os.path.exists(target):
             target = await self._run_search(target)
+            if not target:
+                return None, "cancel"
 
         return target, additional_action
 
     async def process_file_or_folder(self, target):
         """Handles file or folder operations."""
+        file_utils = FileUtils()
         if os.path.exists(target):
             if os.path.isfile(target):
-                return await read_file(target)
+                return await file_utils.read_file(target)
             elif os.path.isdir(target):
-                return await read_folder(target)
+                return await file_utils.read_folder(target)
         else:
             return await self._run_search(target)
         return None
@@ -66,9 +69,9 @@ class CommandProcessor:
 
     def format_input(self, user_input, file_content, additional_action=None):
         """Prepares user input by combining prompt and file content."""
-        formatted_content = f"File Content:\n{file_content.strip()}"
+        formatted_content = f"Content:\n{file_content.strip()}"
         if additional_action:
-            formatted_content = f"{additional_action}\n\n{formatted_content}"
+            user_input = additional_action
         if user_input:
             return f"Prompt:\n{user_input}\n\n{formatted_content}"
         return formatted_content

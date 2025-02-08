@@ -18,10 +18,19 @@ DeepSeek-Shell is a command-line tool for interacting with AI models via the Oll
 
 ### Installation
 
+**Make sure you have Ollama up and running with DeepSeek-r1**
+
+```
+curl -fsSL https://ollama.com/install.sh | sh
+
+ollama pull deepseek-r1:14b
+
+ollama serve
+```
 **Install the necessary dependencies using pip:**
 
 ```
-pip install ollama rich prompt_toolkit
+pip install ollama rich prompt_toolkit aiofiles 
 ```
 
 **To access the script globally from the terminal, create a symlink:**
@@ -50,7 +59,7 @@ python3 main.py
 ```
 
 **Command-Line Arguments**
-
+:
 Specify additional arguments to customize the behavior:
 
 - `--model`: The AI model to use (defaults to `DEFAULT_MODEL`).
@@ -58,13 +67,15 @@ Specify additional arguments to customize the behavior:
 - `--thinking`: Show the AI's thinking process (useful for debugging or understanding).
 - `--prompt`: Provide the initial message to start the conversation.
 - `--file`: Specify a file to include in the chat.
+- `--code`: Outputs code only
+- `--shell`: Generates shell commands
 
 **Pipe Support**
 
 You can pipe input to DeepSeek-Shell:
 
 ```
-cat input.txt | deepshell --prompt "Analyze the content"
+cat input.txt | deepshell  "Analyze the content"
 ```
 
 Currently, piping will not start a chat session, but you can use it to pass content to the tool.

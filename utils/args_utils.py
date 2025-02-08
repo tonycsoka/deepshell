@@ -10,7 +10,6 @@ def parse_args():
     parser.add_argument("--file", type=str, help="File to include in chat")
     parser.add_argument("string_input", nargs="?", type=str, help="Optional string input")
   
-    # Use mutually exclusive group for symlink options.
     symlink_group = parser.add_mutually_exclusive_group()
     symlink_group.add_argument("--install", action="store_true", help="Install symlink for deepshell")
     symlink_group.add_argument("--uninstall", action="store_true", help="Uninstall symlink for deepshell")

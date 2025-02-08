@@ -3,6 +3,7 @@ import os
 from prompt_toolkit import PromptSession
 from prompt_toolkit.shortcuts import prompt, radiolist_dialog
 from prompt_toolkit.completion import WordCompleter
+from chat.streamer import rich_print
 
 async def get_user_input(prompt="You: "):
     """
@@ -18,7 +19,7 @@ async def get_user_input(prompt="You: "):
                 return "exit"
             return user_input
         except KeyboardInterrupt:
-            print("\nExiting chat.")
+            await rich_print("\nExiting chat.")
             return "exit"
     else:
         try:
@@ -37,11 +38,9 @@ async def prompt_search(missing_path):
         results = []
 
         for root, dirs, files in os.walk(home_dir):
-            # Exclude hidden folders and files
             dirs[:] = [d for d in dirs if not d.startswith(".")]
             files = [f for f in files if not f.startswith(".")]
 
-            # Search for matching files and directories
             for name in files + dirs:
                 if missing_path.lower() in name.lower():
                     results.append(os.path.join(root, name))
@@ -62,17 +61,16 @@ async def prompt_search(missing_path):
                 title="Too many matches",
                 text=f"More than 10 matches found for '{missing_path}'. Would you like to modify your search or display all?",
                 values=[("modify", "Modify Search"), ("show", "Show All")]
-            ).run_async()  # Async call
+            ).run_async() 
             if action == "modify":
                 missing_path = await prompt("Modify search term:", default=missing_path).strip()
                 continue
 
-        # Display search results to the user
         choice = await radiolist_dialog(
             title="Select a file",
             text=f"Multiple matches found for '{missing_path}'. Please choose one:",
             values=[(res, res) for res in results] + [("cancel", "Cancel")]
-        ).run_async()  # Async call
+        ).run_async()  
         
         if choice == "cancel":
             return None
@@ -95,4 +93,4 @@ def confirm_execute_command(command):
         elif choice == "cancel":
             return "Command execution canceled."
         else:
-            print("Invalid choice. Please select Execute, Modify, or Cancel.")
+             print("Invalid choice. Please select Execute, Modify, or Cancel.")

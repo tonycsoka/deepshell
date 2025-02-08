@@ -1,6 +1,6 @@
+import asyncio
 from ollama import AsyncClient
-from rich.console import Console
-from chat.streamer import render_response 
+from chat.streamer import rich_print, thinking_animation
 from chat.filtering import Filtering  
 
 class OllamaClient:
@@ -15,7 +15,6 @@ class OllamaClient:
         self.show_thinking = show_thinking or False
         self.thoughts_buffer = []   
         self.history = []
-        self.console = Console()
         self.filtering = Filtering(self)
            
     
@@ -25,22 +24,23 @@ class OllamaClient:
         Pipeline: raw stream → filtering → rendering.
         """
         response = ""
-       
+        animation_task = asyncio.create_task(thinking_animation())
         self.history.append({"role": "user", "content": user_input})
         raw_stream = await self._chat_stream(self.history)
-        self.history.append({"role": "assistant", "content": response})
+        animation_task.cancel()
+   
         async for chunk in self.filtering._filter_thoughts(raw_stream): 
             response += chunk
             if self.render_output and self.config_name == "default":
-                await render_response(chunk, self.console)
-       
+                await rich_print(chunk)
+        self.history.append({"role": "assistant", "content": response})
         if self.config_name == "code":
             response = self.filtering._extract_code(response,self.render_output)
         elif self.config_name == "shell":
             response = self.filtering._extract_code(response,self.render_output,True)
        
         if self.render_output and self.config_name != "default":
-            await render_response(response, self.console) 
+            await rich_print(response)
 
         return response
     

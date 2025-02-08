@@ -2,39 +2,43 @@ import asyncio
 import itertools
 from rich.markdown import Markdown
 from rich.live import Live
+from rich.console import Console
 
-async def render_response(response, client_console):
+console = Console()
+
+
+async def rich_print(content):
     """
-    Renders the response live using Rich.
-    - Displays a brief "AI is thinking" animation immediately upon function call.
-    - If response is a string, simulates a live typing effect.
-    - If response is an async generator, streams it dynamically.
+    Custom print function that handles both live-streaming (async generator) 
+    and regular string output using Rich.
+    """
+    if hasattr(content, "__aiter__"): 
+        displayed_text = ""
+        with Live("", console=console, refresh_per_second=10) as live:
+            async for chunk in content:
+                if chunk.strip():
+                    for char in chunk: 
+                        displayed_text += char
+                        live.update(Markdown(displayed_text), refresh=True)
+                        await asyncio.sleep(0.02)
+    else:
+        displayed_text = ""
+        with Live("", console=console, refresh_per_second=10) as live:
+            for char in content:  
+                displayed_text += char
+                live.update(Markdown(displayed_text), refresh=True)
+                await asyncio.sleep(0.02)
+
+
+async def thinking_animation():
+    """
+    Function that shows a 'thinking' animation while waiting for the response.
+    Loops the animation until raw stream starts.
     """
     thinking_animation = itertools.cycle([".  ", ".. ", "...", "   "])
+    thinking_message = "**AI is thinking** "
     
-    # Start showing the "AI is thinking" animation as soon as the function is called.
-    with Live("", console=client_console, refresh_per_second=10, vertical_overflow="ellipsis") as live:
-        displayed_text = ""
-        thinking_message = "**AI is thinking** "
-        # Display animation until stream starts
-        while not hasattr(response, "__aiter__") and not isinstance(response, str):
-            # Loop the animation while we are not yet receiving the response stream
-            live.update(Markdown(thinking_message + next(thinking_animation)))
-            await asyncio.sleep(0.05)
-        
-        if isinstance(response, str):
-            # If it's a string response, we type it out live
-            for char in response:
-                displayed_text += char
-                live.update(Markdown(displayed_text))
-                await asyncio.sleep(0.02)
-
-        elif hasattr(response, "__aiter__"):
-            # If it's an async generator, we stream it
-            async for chunk in response:
-                text = chunk if isinstance(chunk, str) else str(chunk)
-                if text.strip():
-                    displayed_text += text
-                    live.update(Markdown(displayed_text))
-                await asyncio.sleep(0.02)
-
+    with Live("", console=console, refresh_per_second=10) as live:
+        while True: 
+            live.update(Markdown(thinking_message + next(thinking_animation)), refresh=True)
+            await asyncio.sleep(0.3)
