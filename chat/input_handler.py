@@ -66,7 +66,7 @@ class CommandProcessor:
 
     async def _run_search(self, target):
         """Run the search without using asyncio.run()."""
-        return await ui.prompt_search(target)
+        return await self.prompt_search(target)
 
     def format_input(self, user_input, file_content, additional_action=None):
         """Prepares user input by combining prompt and file content."""

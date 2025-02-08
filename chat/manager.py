@@ -1,3 +1,4 @@
+import os
 import sys
 from chat.user_input import UIManager
 from chat.input_handler import CommandProcessor
@@ -8,14 +9,18 @@ async def start_chat(ollama_client, user_input=None):
     command_processor = CommandProcessor(ollama_client)
     executor = CommandExecutor()
     get_user_input = UIManager().get_user_input
-    
+
+    system_message =f"""Chat with model: {ollama_client.model} in {ollama_client.config_name} mode.
+    \n Type 'exit' to quit. \n
+    """
+
     if not sys.stdout.isatty():
         ollama_client.render_output = False
         response = await ollama_client.chat(user_input)
         print(response)
         return
 
-    await rich_print(f"Chat with model: {ollama_client.model} in {ollama_client.config_name} mode. Type 'exit' to quit.\n")
+    await rich_print(system_message)
 
     while True:
         if not user_input:
