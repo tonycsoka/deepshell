@@ -1,5 +1,7 @@
 # DeepSeek-Shell
 
+![Deepseek-Shell](https://github.com/catoni0/deepseek_shell/blob/main/LOGO.png)
+
 _A whisper in the void, a tool forged in silence._ DeepSeek-Shell is your clandestine terminal companion, bridging the gap between human intent and AI execution. It speaks in commands, listens in context, and acts with precision. DeepSeek-Shell operates with local deepseek-r1 models, ensuring autonomy beyond the reach of prying eyes.
 
 ## Features
