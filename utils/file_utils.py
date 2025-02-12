@@ -33,10 +33,9 @@ class FileUtils:
         return await loop.run_in_executor(None, sys.stdin.read)
 
     async def read_file(self, file_path, root_folder=None):
-        await self.ui.rich_print("\notReading file")
         """Asynchronously reads content from a file, skipping ignored files."""
-        if not root_folder:
-            await self.rich_print(f"Reading {file_path}") 
+      
+        await self.ui.buffer.put(f"\nReading {file_path}") 
         try:
             if any(file_path.endswith(ext) for ext in self.ignore_files):
                 return f"Skipping file (ignored): {file_path}"
@@ -66,12 +65,12 @@ class FileUtils:
 
     async def read_folder(self, folder_path, root_folder=None):
         """Recursively scans and reads all files in a folder, respecting ignore lists."""
-        await self.ui.rich_print(f"Reading {folder_path}")
+        await self.ui.buffer.put(f"\nReading {folder_path}")
         if root_folder is None:
             root_folder = folder_path
         
         try:
-            await self.ui.rich_print(f"Generating structure for {folder_path}")
+            await self.ui.rich_print(f"\nGenerating structure for {folder_path}")
             structure = self.generate_structure(folder_path, root_folder)
             file_contents = "\n\n### File Contents ###\n"
             
@@ -84,7 +83,7 @@ class FileUtils:
                     if not any(file.endswith(ext) for ext in self.ignore_files):
                         content = await self.read_file(file_path, root_folder)
                         file_contents += f"\n{content.strip()}\n"
-            
+                
             return structure + file_contents
         
         except PermissionError:
@@ -112,21 +111,33 @@ class FileUtils:
 
         return results
 
+
     async def process_file_or_folder(self, target):
         """Handles file or folder operations."""
-        await self.ui.rich_print("\nAnalyzing target")
-        if os.path.exists(target):
-            if os.path.isfile(target):
-                return await self.read_file(target)
-            elif os.path.isdir(target):
-                return await self.read_folder(target)
-        else:
-            return await self.prompt_search(target)
+        # Clean up the target path
+        target = target.strip()
+       
+        # Check if target exists; if not, prompt search until a valid result is found or cancel is chosen
+        if not os.path.exists(target):
+            choice = await self.prompt_search(target)
+            if not choice:
+                return None
+            target = choice.strip()
+
+
+        await self.ui.buffer.put("\nAnalyzing the target")
+        # Now process based on whether target is a file or a folder
+        if os.path.isfile(target):
+            return await self.read_file(target)
+        elif os.path.isdir(target):
+            return await self.read_folder(target)
+
         return None
+
 
     async def prompt_search(self, missing_path):
             while True:
-                results = await self.search_files(missing_path)  # Replace with actual search logic
+                results = await self.search_files(missing_path) 
                 if not results:
                     retry = await radiolist_dialog(
                         title="No matches found",
