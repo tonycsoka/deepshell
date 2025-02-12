@@ -1,10 +1,9 @@
 import os
-from sre_compile import NOT_LITERAL_LOC_IGNORE
 import sys
 import aiofiles
 import asyncio
-from chat.streamer import rich_print
-
+from prompt_toolkit.shortcuts import radiolist_dialog
+from ui.ui_manager import UIManager 
 
 class FileUtils:
     def __init__(self, ignore_files=None, ignore_folders=None, scan_dot_folders=False):
@@ -25,6 +24,8 @@ class FileUtils:
         self.ignore_files = ignore_files or self.default_ignore_files
         self.ignore_folders = ignore_folders or self.default_ignore_folders
         self.scan_dot_folders = scan_dot_folders
+        self.ui = UIManager()
+        self.rich_print = self.ui.rich_print
 
     async def read_pipe(self):
         """Read piped input asynchronously."""
@@ -32,9 +33,10 @@ class FileUtils:
         return await loop.run_in_executor(None, sys.stdin.read)
 
     async def read_file(self, file_path, root_folder=None):
+        await self.ui.rich_print("\notReading file")
         """Asynchronously reads content from a file, skipping ignored files."""
         if not root_folder:
-            await rich_print(f"Reading {file_path}") 
+            await self.rich_print(f"Reading {file_path}") 
         try:
             if any(file_path.endswith(ext) for ext in self.ignore_files):
                 return f"Skipping file (ignored): {file_path}"
@@ -46,30 +48,31 @@ class FileUtils:
         except Exception as e:
             return f"Error reading file {file_path}: {e}"
 
-    async def generate_structure(self, folder_path, root_folder, prefix=""):
+    def generate_structure(self, folder_path, root_folder, prefix=""):
         """Generates a textual representation of the folder structure."""
         structure = f"{prefix}{os.path.basename(folder_path)}/\n"
         items = sorted(os.listdir(folder_path))
-        
+
         for item in items:
             item_path = os.path.join(folder_path, item)
             if os.path.isdir(item_path) and item not in self.ignore_folders and (self.scan_dot_folders or not item.startswith('.')):
-                structure += await self.generate_structure(item_path, root_folder, prefix + "--")
+                structure += self.generate_structure(item_path, root_folder, prefix + "--")  # No await needed here
             elif os.path.isfile(item_path) and not any(item.endswith(ext) for ext in self.ignore_files):
                 relative_path = os.path.relpath(item_path, root_folder) if root_folder else item_path
                 structure += f"{prefix}-- {relative_path}\n"
-        
+
         return structure
+
 
     async def read_folder(self, folder_path, root_folder=None):
         """Recursively scans and reads all files in a folder, respecting ignore lists."""
-        await rich_print(f"Reading {folder_path}")
+        await self.ui.rich_print(f"Reading {folder_path}")
         if root_folder is None:
             root_folder = folder_path
         
         try:
-            await rich_print(f"Generating structure for {folder_path}")
-            structure = await self.generate_structure(folder_path, root_folder)
+            await self.ui.rich_print(f"Generating structure for {folder_path}")
+            structure = self.generate_structure(folder_path, root_folder)
             file_contents = "\n\n### File Contents ###\n"
             
             for root, _, files in os.walk(folder_path):
@@ -92,6 +95,7 @@ class FileUtils:
         Searches for a missing file or folder in the specified directory.
         Defaults to the home directory if none is provided.
         """
+   
         if not search_dir:
             search_dir = os.path.expanduser("~")
 
@@ -107,3 +111,38 @@ class FileUtils:
                         return results  # Stop searching if max results reached
 
         return results
+
+    async def process_file_or_folder(self, target):
+        """Handles file or folder operations."""
+        await self.ui.rich_print("\nAnalyzing target")
+        if os.path.exists(target):
+            if os.path.isfile(target):
+                return await self.read_file(target)
+            elif os.path.isdir(target):
+                return await self.read_folder(target)
+        else:
+            return await self.prompt_search(target)
+        return None
+
+    async def prompt_search(self, missing_path):
+            while True:
+                results = await self.search_files(missing_path)  # Replace with actual search logic
+                if not results:
+                    retry = await radiolist_dialog(
+                        title="No matches found",
+                        text=f"No matches found for '{missing_path}'. Would you like to try again?",
+                        values=[("yes", "Yes"), ("no", "No")]
+                    ).run_async()
+                    if retry == "no":
+                        return None
+                    missing_path = await self.ui.get_user_input("Modify search term: ")
+                    continue
+                choice = await radiolist_dialog(
+                    title="Select a file",
+                    text=f"Multiple matches found for '{missing_path}'. Please choose one:",
+                    values=[(res, res) for res in results] + [("cancel", "Cancel")]
+                ).run_async()
+                if choice == "cancel":
+                    return None
+                return choice
+

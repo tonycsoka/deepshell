@@ -1,55 +1,33 @@
 import asyncio
 from ollama import AsyncClient
-from chat.streamer import rich_print, thinking_animation
-from chat.filtering import Filtering
 
 class OllamaClient:
-    def __init__(self, host, model, config, config_name, stream, render_output, show_thinking):
+    def __init__(self, host, model, config, config_name, stream=True, render_output=True, show_thinking=False):
         self.client = AsyncClient(host=host)
-        self.model = model 
-        self.host = host
+        self.model = model
         self.config = config
         self.config_name = config_name
-        self.stream = stream or True
-        self.render_output = render_output or True
-        self.show_thinking = show_thinking or False
-        self.thoughts_buffer = []   
+        self.stream = stream
+        self.render_output = render_output
+        self.show_thinking = show_thinking
+        self.output_buffer = asyncio.Queue()
         self.history = []
-        self.filtering = Filtering(self)
-    
-    async def chat(self, user_input):
-        """
-        Sends a chat request, filters the raw response, and renders it.
-        Pipeline: raw stream → filtering → rendering.
-        """
-        response = ""
-        animation_task = asyncio.create_task(thinking_animation())
-        self.history.append({"role": "user", "content": user_input})
-        raw_stream = await self._chat_stream(self.history)
-        animation_task.cancel()
+        self.last_response = ""
 
-        async for chunk in self.filtering._filter_thoughts(raw_stream): 
-            response += chunk
-            if self.render_output and self.config_name == "default":
-                await rich_print(chunk)
-        # 
-        if self.config_name == "shell":
-            response = await self.filtering._extract_code(response, self.render_output, True)
-        elif self.config_name == "code":
-            response = await self.filtering._extract_code(response, self.render_output) 
-        self.history.append({"role": "assistant", "content": response})
+    async def _chat_stream(self, input):
+        """Fetches response from the Ollama API and streams into output buffer."""
+       
+        self.history.append({"role": "user", "content": input})
+       
 
-        
-        return response
-
-    async def _chat_stream(self, user_input):
-        """
-        Sends the chat request to the Ollama API and returns the raw stream.
-        """
-        return await self.client.chat(
+        async for part in await self.client.chat(
             model=self.model,
-            messages=user_input,
+            messages=self.history,
             options=self.config,
             stream=self.stream
-        )
+        ):
+            await self.output_buffer.put(part.get('message', {}).get('content', ''))  # Push raw stream into buffer
+        if self.config_name == "shell":
+            self.history = []
+        await self.output_buffer.put(None)
 

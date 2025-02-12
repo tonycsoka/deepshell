@@ -1,7 +1,9 @@
 import os
 import re
+import asyncio
 from utils.file_utils import FileUtils
-from chat.user_input import UIManager
+
+
 
 class CommandProcessor:
     """Handles user input"""
@@ -10,14 +12,15 @@ class CommandProcessor:
         self.ollama_client = ollama_client
         self.default_config = ollama_client.config
         self.config = ollama_client.config
-        self.prompt_search = UIManager.prompt_search
+        self.file_utils = FileUtils()
+
     
     async def handle_command(self, user_input):
         """Processes commands, handles file/folder operations, and updates config."""
         if user_input:
             target, additional_action = await self.detect_action(user_input)
             if target:
-                file_content = await self.process_file_or_folder(target)
+                file_content = await self.file_utils.process_file_or_folder(target)
                 if file_content:
                     return self.format_input(user_input, file_content, additional_action)
             else:
@@ -45,28 +48,10 @@ class CommandProcessor:
 
         if target == "this folder":
             target = os.getcwd()
-        elif not os.path.exists(target):
-            target = await self._run_search(target)
-            if not target:
-                return None, "cancel"
-
+                       
         return target, additional_action
 
-    async def process_file_or_folder(self, target):
-        """Handles file or folder operations."""
-        file_utils = FileUtils()
-        if os.path.exists(target):
-            if os.path.isfile(target):
-                return await file_utils.read_file(target)
-            elif os.path.isdir(target):
-                return await file_utils.read_folder(target)
-        else:
-            return await self._run_search(target)
-        return None
 
-    async def _run_search(self, target):
-        """Run the search without using asyncio.run()."""
-        return await self.prompt_search(target)
 
     def format_input(self, user_input, file_content, additional_action=None):
         """Prepares user input by combining prompt and file content."""

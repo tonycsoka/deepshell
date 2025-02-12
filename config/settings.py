@@ -4,6 +4,8 @@ from config.system_prompts import DEFAULT, CODE, SHELL
 from ollama_client.api_client import OllamaClient
 from utils.args_utils import parse_args 
 
+
+
 # Settings
 DEFAULT_MODEL = "deepseek-r1:14b"
 DEFAULT_HOST = "http://localhost:11434"
@@ -21,6 +23,7 @@ class ClientDeployer:
         self.model = DEFAULT_MODEL
         self.config = self.generate_config(temp=0.6, prompt=DEFAULT)
         self.stream = True
+
 
         # Now let's prioritize the config_name and adjust accordingly
         if self.args.shell or self.config_name == "shell":
@@ -44,7 +47,7 @@ class ClientDeployer:
             config=self.config,
             config_name=self.config_name,
             stream=self.stream,
-            render_output=not sys.stdout.isatty(),
+            render_output=sys.stdout.isatty(),
             show_thinking=self.args.thinking
         )
 
@@ -52,7 +55,7 @@ class ClientDeployer:
         self.config = self.generate_config(temp=0.4, prompt=SHELL)
         self.config_name = "shell"
         self.model = SHELL_MODEL
-        self.stream = False
+        self.stream = True
 
     def _configure_code(self):
         self.config = self.generate_config(temp=0.5, prompt=CODE)

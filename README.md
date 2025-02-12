@@ -7,7 +7,6 @@ _A whisper in the void, a tool forged in silence._ DeepSeek-Shell is your clande
 ## Features
 
 - **Silent Precision** – Filters out unnecessary thoughts, leaving only clean responses.
-- **Markdown-Enhanced Streaming** – Responses are streamed in markdown for clarity.
 - **Intelligent File Handling** – Read, analyze, and act on files or entire directories asynchronously.
 - **Advanced Command Parsing** – Detects natural instructions like _"open this folder and analyze the code"_.
 - **Real-Time AI Interaction** – A dialogue system built for seamless terminal operation.
@@ -27,7 +26,7 @@ ollama serve
 **Prepare the tool:**
 
 ```sh
-pip install ollama rich prompt_toolkit aiofiles 
+pip install ollama prompt_toolkit aiofiles
 ```
 
 **Integrate it into your system:**

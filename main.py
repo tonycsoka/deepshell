@@ -1,18 +1,15 @@
 import asyncio
 import sys
 from config.settings import ClientDeployer
-from chat.manager import start_chat
 from utils.symlink_utils import create_symlink, remove_symlink
+from chatbot_manager.chatbot_manager import ChatManager
 from utils.file_utils import FileUtils
-from chat.input_handler import CommandProcessor
+from utils.command_processor import CommandProcessor
 
 async def main():
-
     """Main function to handle Ollama Chat Mode."""
     deployer = ClientDeployer()
-    ollama_client = deployer.deploy()
-    file_utils = FileUtils()
-    command_processor = CommandProcessor(ollama_client) 
+    ollama_client = deployer.deploy()  # This will now only deal with API interactions
     args = deployer.args
 
     if args.install:
@@ -22,24 +19,31 @@ async def main():
         remove_symlink()
         return
 
-    user_input = args.prompt or args.string_input or ""
-    # Prioritize file argument over piped input.
-    if args.file:
-        file_content = await command_processor.process_file_or_folder(args.file)
-    elif not sys.stdin.isatty():
-        file_content =  await file_utils.read_pipe()
-    else:
-        file_content = None
-   
-    if file_content:
-        user_input = command_processor.format_input(user_input, file_content)
-    else:
-        user_input = await command_processor.handle_command(user_input)
+    user_input = args.prompt or args.string_input or None
+    chat_manager = ChatManager(ollama_client)
 
-    await start_chat(ollama_client,user_input)
+    if not sys.stdin.isatty():
+        ollama_client.render_output = False
+        utils = FileUtils()
+        pipe = await utils.read_pipe()
+        if pipe:
+            if user_input:
+                processor = CommandProcessor(ollama_client)
+                user_input = processor.format_input(user_input,pipe)
+            else: 
+                user_input = pipe
+
+        await chat_manager.task_manager(user_input)
+    
+        return
+    else:
+
+        await chat_manager.start_chat(user_input,args.file)
+
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except Exception as e:
         sys.exit(f"Error: {e}")
+
