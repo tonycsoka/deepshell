@@ -18,7 +18,6 @@ class OllamaClient:
         """Fetches response from the Ollama API and streams into output buffer."""
        
         self.history.append({"role": "user", "content": input})
-       
 
         async for part in await self.client.chat(
             model=self.model,

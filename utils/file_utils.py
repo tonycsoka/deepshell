@@ -2,11 +2,10 @@ import os
 import sys
 import aiofiles
 import asyncio
-from prompt_toolkit.shortcuts import radiolist_dialog
-from ui.ui_manager import UIManager 
+
 
 class FileUtils:
-    def __init__(self, ignore_files=None, ignore_folders=None, scan_dot_folders=False):
+    def __init__(self, ui=None,  ignore_files=None, ignore_folders=None, scan_dot_folders=False):
         """
         Initializes the FileUtils with customizable options to ignore certain files and folders.
 
@@ -14,18 +13,16 @@ class FileUtils:
         :param ignore_folders: List of folder names to ignore.
         :param scan_dot_folders: Whether to scan hidden folders (those starting with a dot). Default is False.
         """
+        self.ui = ui
         self.default_ignore_files = [
             '.pyc', '.pyo', '.log', '.bak', '.exe', '.bin', '.dll', '.so', '.app', '.zip',
             '.tar', '.gz', '.bz2', '.xz', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff',
             '.mp3', '.wav', '.flac', '.mp4', '.avi', '.mkv', '.mov', '.apk', '.ipa', '.DS_Store'
         ]
         self.default_ignore_folders = ['__pycache__', '.git', '.svn', '.hg']
-        
         self.ignore_files = ignore_files or self.default_ignore_files
         self.ignore_folders = ignore_folders or self.default_ignore_folders
         self.scan_dot_folders = scan_dot_folders
-        self.ui = UIManager()
-        self.rich_print = self.ui.rich_print
 
     async def read_pipe(self):
         """Read piped input asynchronously."""
@@ -35,7 +32,7 @@ class FileUtils:
     async def read_file(self, file_path, root_folder=None):
         """Asynchronously reads content from a file, skipping ignored files."""
       
-        await self.ui.buffer.put(f"\nReading {file_path}") 
+       # await self.ui.buffer.put(f"\nReading {file_path}") 
         try:
             if any(file_path.endswith(ext) for ext in self.ignore_files):
                 return f"Skipping file (ignored): {file_path}"
@@ -65,12 +62,12 @@ class FileUtils:
 
     async def read_folder(self, folder_path, root_folder=None):
         """Recursively scans and reads all files in a folder, respecting ignore lists."""
-        await self.ui.buffer.put(f"\nReading {folder_path}")
+      #  await self.ui.buffer.put(f"\nReading {folder_path}")
         if root_folder is None:
             root_folder = folder_path
         
         try:
-            await self.ui.rich_print(f"\nGenerating structure for {folder_path}")
+          #  await self.ui.rich_print(f"\nGenerating structure for {folder_path}")
             structure = self.generate_structure(folder_path, root_folder)
             file_contents = "\n\n### File Contents ###\n"
             
@@ -125,7 +122,7 @@ class FileUtils:
             target = choice.strip()
 
 
-        await self.ui.buffer.put("\nAnalyzing the target")
+      #  await self.ui.buffer.put("\nAnalyzing the target")
         # Now process based on whether target is a file or a folder
         if os.path.isfile(target):
             return await self.read_file(target)
@@ -134,26 +131,72 @@ class FileUtils:
 
         return None
 
-
+    #
+    # async def prompt_search(self, missing_path):
+    #     while True:
+    #         results = await self.search_files(missing_path)
+    #         if not results:
+    #             retry = await self.ui.run_dialog(
+    #                 lambda: radiolist_dialog(
+    #                     title="No matches found",
+    #                     text=f"No matches found for '{missing_path}'. Would you like to try again?",
+    #                     values=[("yes", "Yes"), ("no", "No")]
+    #                 ).run_async()
+    #             )
+    #             if retry == "no":
+    #                 return None
+    #             missing_path = await self.ui.get_user_input("Modify search term: ")
+    #             continue
+    #
+    #         choice = await self.ui.run_dialog(
+    #             lambda: radiolist_dialog(
+    #                 title="Select a file",
+    #                 text=f"Multiple matches found for '{missing_path}'. Please choose one:",
+    #                 values=[(res, res) for res in results] + [("cancel", "Cancel")]
+    #             ).run_async()
+    #         )
+    #         if choice == "cancel":
+    #             return None
+    #         return choice
+    #
     async def prompt_search(self, missing_path):
-            while True:
-                results = await self.search_files(missing_path) 
-                if not results:
-                    retry = await radiolist_dialog(
-                        title="No matches found",
-                        text=f"No matches found for '{missing_path}'. Would you like to try again?",
-                        values=[("yes", "Yes"), ("no", "No")]
-                    ).run_async()
-                    if retry == "no":
-                        return None
-                    missing_path = await self.ui.get_user_input("Modify search term: ")
-                    continue
-                choice = await radiolist_dialog(
-                    title="Select a file",
-                    text=f"Multiple matches found for '{missing_path}'. Please choose one:",
-                    values=[(res, res) for res in results] + [("cancel", "Cancel")]
-                ).run_async()
-                if choice == "cancel":
-                    return None
-                return choice
+        while True:
+            # Search for files based on the missing_path
+            results = await self.search_files(missing_path)
+            
+            if not results:
+                # No results found, prompt user to modify the search term
+                await self._print_message(f"No matches found for '{missing_path}'.")
+                missing_path = await self._get_user_input("Modify search term: ")
+                continue
 
+            # Results found, prompt user to select one
+            await self._print_message(f"Multiple matches found for '{missing_path}'. Please select one:")
+            for i, res in enumerate(results):
+                await self._print_message(f"{i + 1}. {res}")
+
+            # Wait for user to input a number corresponding to the selection
+            number = await self._get_user_input("Enter the number of your choice: ")
+            
+            if number.isdigit() and 1 <= int(number) <= len(results):
+                return results[int(number) - 1]  # Return the selected result
+
+            # If invalid input, notify user
+            await self._print_message("**Invalid input. Please enter a valid number.**")
+
+
+    async def _get_user_input(self, prompt_text: str = "Enter input:"):
+        """Get user input asynchronously, either through UI or terminal."""
+        if self.ui is not None:
+            return await self.ui.get_user_input(prompt_text)
+        else:
+            # Fallback to classic terminal input
+            return input(prompt_text)
+
+
+    async def _print_message(self, message: str):
+        """Print messages either through UI or terminal."""
+        if self.ui is not None:
+            await self.ui.fancy_print(message)
+        else:
+            print(message)

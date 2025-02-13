@@ -7,44 +7,57 @@ class PipeFilter:
         self.input_buffer = ollama_client.output_buffer  
         self.buffer = asyncio.Queue()
 
-
-
     async def process_stream(self):
+        self.full_input = []  
+        self.results = []  
         thinking = False
-        partial_thought = ""
-        self.results = []  # Ensure results list exists
+        thought_buffer = []
 
         while True:
             message = await self.input_buffer.get()
-            # print(f"raw : {message}")# Fetch one item at a time
-
             if message is None:
                 break  
 
-            if "<think>" in message:
-                thinking = True
-                parts = message.split("<think>", 1)
-                partial_thought = parts[1] if len(parts) > 1 else ""  # Start accumulating thoughts
-                continue 
+            self.full_input.append(message) 
+            output = [] 
+            i = 0
 
-            if "</think>" in message and thinking:
-                thinking = False
-                parts = partial_thought.split("</think>", 1)
-                thought_content = parts[0].strip()  
+            while i < len(message):
+                if message[i:].startswith("<think>"):
+                    thinking = True
+                    i += 7
+                    continue
+                elif message[i:].startswith("</think>"):
+                    thinking = False
+                    i += 8  
 
-                if self.ollama_client.show_thinking:
-                    await self.buffer.put(f"\n**AI's Thoughts:** {thought_content}\n")
+                    if self.ollama_client.show_thinking:
+                        await self.buffer.put("\nFinal answer: ")
+                    continue
 
-                partial_thought = "" 
-                message = parts[1] if len(parts) > 1 else "" 
-            if not thinking and message:
-                self.results.append(message)  
-                await self.buffer.put(message) 
+                if thinking:
+                    thought_buffer.append(message[i])
+                    if self.ollama_client.show_thinking:
+                        await self.buffer.put(message[i])
+                else:
+                    output.append(message[i])
 
-        self.ollama_client.last_response = ''.join(self.results)
+                i += 1
+
+            filtered_message = "".join(output)
+            if filtered_message.strip():
+                await self.buffer.put(filtered_message)
+                self.results.append(filtered_message)
+
+        full_text = "".join(self.full_input)
+        thoughts = re.findall(r"<think>(.*?)</think>", full_text, flags=re.DOTALL)
+
+        self.ollama_client.last_response = "".join(self.results)
         if self.ollama_client.config_name != "shell":
             self.ollama_client.history.append({"role": "assistant", "content": self.ollama_client.last_response})
-        await self.buffer.put(None)
+
+        self.ollama_client.last_thoughts = thoughts
+    
 
 
     async def extract_code(self, response = None, keep_formatting=True, shell=False):

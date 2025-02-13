@@ -1,18 +1,15 @@
 import os
 import re
-import asyncio
 from utils.file_utils import FileUtils
-
-
 
 class CommandProcessor:
     """Handles user input"""
     
-    def __init__(self, ollama_client):
-        self.ollama_client = ollama_client
-        self.default_config = ollama_client.config
-        self.config = ollama_client.config
-        self.file_utils = FileUtils()
+    def __init__(self, client,ui = None):
+        self.client = client
+        self.default_config = client.config
+        self.config = client.config
+        self.file_utils = FileUtils(ui)
 
     
     async def handle_command(self, user_input):
@@ -48,14 +45,12 @@ class CommandProcessor:
 
         if target == "this folder":
             target = os.getcwd()
-                       
         return target, additional_action
-
 
 
     def format_input(self, user_input, file_content, additional_action=None):
         """Prepares user input by combining prompt and file content."""
-        formatted_content = f"Content:\n{file_content.strip()}"
+        formatted_content = f"Content:\n{file_content}"
         if additional_action:
             user_input = additional_action
         if user_input:
