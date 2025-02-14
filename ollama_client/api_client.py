@@ -1,12 +1,13 @@
 import asyncio
 from ollama import AsyncClient
+from config.enum import Mode
 
 class OllamaClient:
-    def __init__(self, host, model, config, config_name, stream=True, render_output=True, show_thinking=False):
+    def __init__(self, host, model, config, mode, stream=True, render_output=True, show_thinking=False):
         self.client = AsyncClient(host=host)
         self.model = model
         self.config = config
-        self.config_name = config_name
+        self.mode = mode
         self.stream = stream
         self.render_output = render_output
         self.show_thinking = show_thinking
@@ -26,7 +27,7 @@ class OllamaClient:
             stream=self.stream
         ):
             await self.output_buffer.put(part.get('message', {}).get('content', ''))  # Push raw stream into buffer
-        if self.config_name == "shell":
+        if self.mode == Mode.SHELL:
             self.history = []
         await self.output_buffer.put(None)
 
