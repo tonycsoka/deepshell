@@ -1,6 +1,9 @@
 import os
 import re
+import platform
+from config.settings import Mode
 from utils.file_utils import FileUtils
+from utils.shell_utils import CommandExecutor
 
 class CommandProcessor:
     """Handles user input"""
@@ -10,10 +13,18 @@ class CommandProcessor:
         self.default_config = client.config
         self.config = client.config
         self.file_utils = FileUtils(ui)
+        self.executor = CommandExecutor(ui)
 
     
     async def handle_command(self, user_input):
         """Processes commands, handles file/folder operations, and updates config."""
+        bypass_flag = False
+        
+        if user_input.startswith("!"):
+            user_input = user_input[1:] 
+            bypass_flag = True
+            return user_input, bypass_flag
+
         if user_input:
             target, additional_action = await self.detect_action(user_input)
             if target:
@@ -54,5 +65,7 @@ class CommandProcessor:
         if additional_action:
             user_input = additional_action
         if user_input:
+            if self.client.mode == Mode.SHELL:
+                user_input += f"OS: {platform.uname()}"
             return f"Prompt:\n{user_input}\n\n{formatted_content}"
         return formatted_content

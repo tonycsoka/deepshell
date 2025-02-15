@@ -1,17 +1,14 @@
-import asyncio
 import sys
-from config.settings import ClientDeployer
+import asyncio
+from ollama_client.client_deployer import ClientDeployer
 from utils.symlink_utils import create_symlink, remove_symlink
 from chatbot_manager.chatbot_manager import ChatManager
-from utils.file_utils import FileUtils
-from utils.command_processor import CommandProcessor
 from ui.ui import ChatMode
-from config.settings import Mode
+from utils.pipe_utils import PipeUtils
 
 def main():
-    # You can also choose a mode here if desired:
-    deployer = ClientDeployer(mode=Mode.DEFAULT)
-    ollama_client = deployer.deploy()  # Now includes the mode in the client
+    deployer = ClientDeployer()
+    ollama_client = deployer.deploy()
     args = deployer.args
 
     if args.install:
@@ -22,23 +19,15 @@ def main():
         return
 
     user_input = args.prompt or args.string_input or None
-    
+
     if sys.stdin.isatty():
         app = ChatMode(ollama_client, user_input, args.file)
         app.run()
     else:
         ollama_client.render_output = False
         chat_manager = ChatManager(ollama_client)
-        utils = FileUtils()
-        pipe = asyncio.create_task(utils.read_pipe())
-        if pipe:
-            if user_input:
-                processor = CommandProcessor(ollama_client)
-                user_input = processor.format_input(user_input, pipe)
-            else: 
-                user_input = pipe
-        asyncio.create_task(chat_manager.task_manager(user_input))
-        return
+        pipe_utils = PipeUtils(chat_manager)
+        asyncio.run(pipe_utils.run(ollama_client, user_input)) 
 
 if __name__ == "__main__":
     main()

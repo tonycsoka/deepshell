@@ -1,10 +1,11 @@
 import asyncio
+import secrets
 from chatbot_manager.chatbot_manager import ChatManager
 from textual.app import App, ComposeResult
 from textual.widgets import Input, RichLog
 from textual import events
 from textual.containers import Vertical
-from rich.markdown import Markdown as RichMarkdown
+from ui.rendering import MarkdownParser
 
 class ChatMode(App):
     _instance = None
@@ -20,11 +21,14 @@ class ChatMode(App):
             super().__init__() 
             if self._initialized:
                 return
+            self.pswd = None
             self.client = client
             self.manager = ChatManager(client,self)
             self.buffer= asyncio.Queue()
+            self.rendering = MarkdownParser(self)
             self.user_input = user_input
-            self.file = file 
+            self.file = file
+           
             self.system_message = (
             f"Chat with model: {self.client.model} in {self.client.mode.name} mode.\n\n"
             "Type 'exit' to quit.\n\n"
@@ -43,12 +47,11 @@ class ChatMode(App):
         self.rich_log_widget = self.query_one(RichLog)
         self.input_widget = self.query_one(Input)
         self.input_widget.focus()
-       # asyncio.create_task(self.fancy_printer())
-        asyncio.create_task(self.render_output())
+        asyncio.create_task(self.rendering.process_markdown())
         asyncio.create_task(self.buffer.put(self.system_message))
         if self.user_input or self.file:
             asyncio.create_task(self.manager.deploy_task(self.user_input,self.file))
-            asyncio.create_task(self.buffer.put(f"\n\nYou: {self.user_input or self.file}\n\n"))
+            asyncio.create_task(self.buffer.put(f"\nYou: {self.user_input or self.file}\n"))
             asyncio.create_task(self.buffer.put("AI: "))
 
 
@@ -67,12 +70,15 @@ class ChatMode(App):
             
             if text:
                 if text.lower() == "exit":
+                    if self.pswd:
+                        self.pswd = secrets.token_urlsafe(32)
+                        self.pswd = None
                     self.exit()
                 else:
-                    asyncio.create_task(self.buffer.put(f"\n\n**You:** {text}\n\n"))
+                    asyncio.create_task(self.buffer.put(f"\n**You:** {text}\n"))
                     self.input_widget.clear()
                     self.input_widget.focus()
-                    asyncio.create_task(self.buffer.put("\n\nAI: "))
+                    asyncio.create_task(self.buffer.put("\nAI: "))
                     asyncio.create_task(self.manager.deploy_task(text))
 
 
@@ -86,7 +92,7 @@ class ChatMode(App):
         """Waits for user input asynchronously and returns the value.
         If is_password is True, masks the input like a password.
         """
-        await self.buffer.put(f"\n\nSystem: {prompt_text}\n\n")
+        await self.buffer.put(f"\nSystem: {prompt_text}\n")
         
         self.input_widget.value = input_text  # Set initial text
         self.input_widget.placeholder = prompt_text
@@ -102,7 +108,7 @@ class ChatMode(App):
         
         if is_password:
             self.input_widget.password = False
-            self.input_widget.placeholder = "Type here and press Enter..."
+            self.input_widget.placeholder = "Type here and press Enter:..."
         
         return user_input
 
@@ -121,25 +127,6 @@ class ChatMode(App):
         else:
              await self.buffer.put(content)
                    
-    async def render_output(self):
-        accumulated_text = ""
-        while True:
-            chunk = await self.buffer.get()
-            if chunk is None:
-                break
-            accumulated_text += chunk  
-            self.rich_log_widget.clear()  
-            self.rich_log_widget.write(RichMarkdown(accumulated_text))
-            self.rich_log_widget.scroll_end()
-            await asyncio.sleep(0.01)
-        
-        if accumulated_text:
-            self.rich_log_widget.clear()
-            self.rich_log_widget.write(RichMarkdown(accumulated_text))
-            self.rich_log_widget.scroll_end()
-
-
- 
     async def transfer_buffer(self, source_buffer):
         """
         Continuously transfer data from the source_buffer (e.g. filtering's buffer)
@@ -150,8 +137,6 @@ class ChatMode(App):
             if chunk is None:
                 break
             await self.buffer.put(chunk)
-        # Signal completion.
-       # await self.buffer.put(None)
 
 
     async def yes_no_prompt(self,prompt_text):
@@ -168,5 +153,6 @@ class ChatMode(App):
                     return False
 
             else:
-                await self.buffer.put("\n\nSystem: Invalid choice, it's a Yes or No question.\n\n")
+                await self.buffer.put("\nIt is a Yes or No question.\n")
+
 

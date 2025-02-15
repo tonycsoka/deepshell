@@ -1,9 +1,8 @@
 import os
-import sys
 import aiofiles
 import asyncio
 from ui.popups import RadiolistPopup
-
+from config.file_utils_config import *
 
 class FileUtils:
     def __init__(self, ui=None, safe_extensions=None, ignore_folders=None, scan_dot_folders=False):
@@ -17,32 +16,15 @@ class FileUtils:
         :param scan_dot_folders: Whether to scan hidden folders (starting with a dot). Default is False.
         """
         self.ui = ui
-       
-        self.default_safe_extensions = [
-            # General text formats
-            '.txt', '.md', '.json', '.csv', '.ini', '.cfg', '.xml',  
-            '.yaml', '.yml', '.toml', '.log', '.sql', '.html', '.htm',  
-            '.css', '.js', '.conf', '.properties', '.rst',
-
-            # Programming languages
-            '.py', '.c', '.cpp', '.h', '.hpp', '.java', '.cs', '.rs', '.go',  
-            '.rb', '.php', '.sh', '.bat', '.pl', '.lua', '.swift', '.kt', '.m',  
-            '.r', '.jl', '.dart', '.ts', '.v', '.scala', '.fs', '.asm', '.s',  
-            '.vbs', '.ps1', '.clj', '.groovy', '.perl', '.f90', '.f95', '.ml'
-        ]
-
+        self.default_safe_extensions = SUPPORTED_EXTENSIONS
         self.safe_extensions = safe_extensions or self.default_safe_extensions
-
-        self.default_ignore_folders = ['__pycache__', '.git', '.svn', '.hg']
+        self.default_ignore_folders = IGNORED_FOLDERS       
         self.ignore_folders = ignore_folders or self.default_ignore_folders
         self.scan_dot_folders = scan_dot_folders
+        self.max_file_size = MAX_FILE_SIZE
+        self.max_lines = MAX_LINES
+        self.chunk_size = CHUNK_SIZE
 
-    async def read_pipe(self):
-        """Read piped input asynchronously."""
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, sys.stdin.read)
-
-    
     async def process_file_or_folder(self, target):
         """Handles file or folder operations.""" 
         target = target.strip()
@@ -52,7 +34,7 @@ class FileUtils:
             if not choice:
                 return None
             target = choice
-        await self._print_message(f"\n\nAnalyzing {target}\n\n")
+        await self._print_message(f"\nAnalyzing {target}\n")
 
         if os.path.isfile(target):
             return await self.read_file(target)
@@ -62,27 +44,80 @@ class FileUtils:
         return None
 
     async def read_file(self, file_path, root_folder=None):
-        """Asynchronously reads content from a file if its extension is in the safe list.
-           Uses a timeout to cancel if reading takes too long.
-        """
-        # Print status message
-        await self._print_message(f"\n\nReading {file_path}\n\n")
+        """Reads a file if it's safe or has no extension but matches known patterns."""
+        await self._print_message(f"\nReading {file_path}\n")
         try:
-            # If the file's extension is not in the whitelist, skip it.
-            if not any(file_path.lower().endswith(ext) for ext in self.safe_extensions):
+            if not self._is_safe_file(file_path):
                 return f"Skipping file (unsupported): {file_path}"
-            
-            relative_path = os.path.relpath(file_path, root_folder) if root_folder else file_path
 
-            async with aiofiles.open(file_path, 'r', encoding="utf-8", errors="ignore") as file:
-                try:
-                    # Set a timeout (e.g., 10 seconds) for reading the file.
-                    content = await asyncio.wait_for(file.read(), timeout=10)
-                except asyncio.TimeoutError:
-                    return f"Skipping file (timeout): {file_path}"
+            relative_path = os.path.relpath(file_path, root_folder) if root_folder else file_path
+            if os.path.getsize(file_path) > self.max_file_size:
+                content = await self._read_last_n_lines(file_path, self.max_lines)
+            else:
+                async with aiofiles.open(file_path, 'r', encoding="utf-8", errors="ignore") as file:
+                    content = await file.read()
+
             return f"--------- {relative_path} ---------\n" + content
+
         except Exception as e:
             return f"Error reading file {file_path}: {e}"
+
+    def _is_safe_file(self, file_path):
+        """Check if the file has a safe extension or can be identified as a known text format."""
+        if any(file_path.lower().endswith(ext) for ext in self.safe_extensions):
+            return True  # Extension is whitelisted
+
+        if '.' not in os.path.basename(file_path):  # No extension
+            return self._is_text_file(file_path)  # Try fallback detection
+
+        return False  # Unrecognized file type
+
+    def _is_text_file(self, file_path, check_bytes=512):
+        """Try to determine if a file is text-based by reading its first chunk."""
+        try:
+            with open(file_path, "rb") as f:
+                chunk = f.read(check_bytes)
+                return all(32 <= byte <= 126 or byte in (9, 10, 13) for byte in chunk)  # Basic ASCII/UTF-8 check
+        except Exception:
+            return False
+
+
+    async def _read_last_n_lines(self, file_path, num_lines):
+            """Reads the last N lines of a file asynchronously using a buffered approach."""
+            buffer = []
+            loop = asyncio.get_running_loop()
+
+            async with aiofiles.open(file_path, 'r', encoding="utf-8", errors="ignore") as file:
+                # Get file size using synchronous function in thread pool
+                file_size = await loop.run_in_executor(None, lambda: self._get_file_size(file_path))
+                pos = file_size
+                data = ""
+
+                while pos > 0 and len(buffer) < num_lines:
+                    pos = max(0, pos - self.chunk_size)
+                    await file.seek(pos)  # Seek is now async
+                    chunk = await file.read(self.chunk_size)
+                    data = chunk + data  # Prepend new chunk
+                    lines = data.splitlines()
+
+                    if len(lines) > num_lines:
+                        buffer = lines[-num_lines:]
+                        break
+                    else:
+                        buffer = lines
+
+                return "\n".join(buffer) if buffer else "[File is empty]"
+
+    def _get_file_size(self, file_path):
+            """Gets file size synchronously for compatibility with aiofiles."""
+            try:
+                with open(file_path, "rb") as f:
+                    f.seek(0, 2)  # Move to end of file
+                    return f.tell()
+            except Exception:
+                return 0
+
+
 
     def generate_structure(self, folder_path, root_folder, prefix=""):
         """
@@ -100,7 +135,6 @@ class FileUtils:
             if os.path.isdir(item_path) and item not in self.ignore_folders and (self.scan_dot_folders or not item.startswith('.')):
                 structure += self.generate_structure(item_path, root_folder, prefix + "--")
             elif os.path.isfile(item_path):
-                # All files are included in the structure, even if they are not safe.
                 relative_path = os.path.relpath(item_path, root_folder) if root_folder else item_path
                 structure += f"{prefix}-- {relative_path}\n"
 
@@ -115,17 +149,15 @@ class FileUtils:
             root_folder = folder_path
 
         try:
-            await self._print_message(f"\n\nGenerating structure for {folder_path}\n\n")
+            await self._print_message(f"\nGenerating structure for {folder_path}\n\n")
             structure = self.generate_structure(folder_path, root_folder)
-            file_contents = "\n\n### File Contents ###\n"
+            file_contents = "\n### File Contents ###\n"
             
             for root, _, files in os.walk(folder_path):
-                # Skip ignored folders.
                 if any(ignored in root.split(os.sep) for ignored in self.ignore_folders):
                     continue
                 for file in files:
                     file_path = os.path.join(root, file)
-                    # Use the safe whitelist to decide whether to read the file.
                     if not any(file.lower().endswith(ext) for ext in self.safe_extensions):
                         file_contents += f"\n\nSkipping file (unsupported): {file_path}\n\n"
                     else:
@@ -146,7 +178,6 @@ class FileUtils:
 
         results = []
         for root, dirs, files in os.walk(search_dir):
-            # Optionally skip hidden directories.
             dirs[:] = [d for d in dirs if not d.startswith(".")]
             files = [f for f in files if not f.startswith(".")]
 
@@ -219,4 +250,3 @@ class FileUtils:
             await self.ui.fancy_print(message)
         else:
             print(message)
-

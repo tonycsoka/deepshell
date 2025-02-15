@@ -1,6 +1,6 @@
 import asyncio
 from ollama import AsyncClient
-from config.enum import Mode
+from config.settings import Mode, MODE_CONFIGS
 
 class OllamaClient:
     def __init__(self, host, model, config, mode, stream=True, render_output=True, show_thinking=False):
@@ -14,6 +14,19 @@ class OllamaClient:
         self.output_buffer = asyncio.Queue()
         self.history = []
         self.last_response = ""
+
+    def switch_mode(self, mode):
+        """Dynamically switches mode and updates config."""
+        if mode == self.mode:
+            return  # No need to switch if already in the same mode
+
+        config = MODE_CONFIGS[mode]
+        self.model = config["model"]
+        self.config = {"temperature": config["temp"], "system": config["prompt"]}
+        self.stream = config["stream"]
+        self.mode = mode
+        self.history.clear()
+
 
     async def _chat_stream(self, input):
         """Fetches response from the Ollama API and streams into output buffer."""
