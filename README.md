@@ -49,7 +49,7 @@ DeepSeek-Shell’s behavior is governed by the `config/settings.py` file.
 **Summon the AI:**
 
 ```sh
-deepseek
+deepshell
 ```
 
 or, for the uninitiated:
@@ -85,13 +85,13 @@ cat input.txt | deepshell "Analyze the content"
 **Delve Into the Abyss of Folders:**
 
 ```sh
-deepseek "open this folder"
+deepshell "open this folder"
 ```
 
 **Unify the Question and the Execution:**
 
 ```sh
-deepseek "open this folder and analyze the code"
+deepshell "open this folder and analyze the code"
 ```
 
 _A tool forged for precision in a chaotic world. Your words, its execution, seamless in form._
