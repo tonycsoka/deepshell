@@ -14,7 +14,6 @@ class CommandProcessor:
         self.config = client.config
         self.file_utils = FileUtils(ui)
         self.executor = CommandExecutor(ui)
-
     
     async def handle_command(self, user_input):
         """Processes commands, handles file/folder operations, and updates config."""

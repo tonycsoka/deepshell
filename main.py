@@ -1,16 +1,14 @@
+
 import sys
 import asyncio
-from ollama_client.client_deployer import ClientDeployer
 from utils.symlink_utils import create_symlink, remove_symlink
 from chatbot_manager.chatbot_manager import ChatManager
-from ui.ui import ChatMode
 from utils.pipe_utils import PipeUtils
+from utils.args_utils import parse_args 
 
 def main():
-    deployer = ClientDeployer()
-    ollama_client = deployer.deploy()
-    args = deployer.args
-
+    args = parse_args()
+    
     if args.install:
         create_symlink()
         return
@@ -18,16 +16,32 @@ def main():
         remove_symlink()
         return
 
-    user_input = args.prompt or args.string_input or None
+    chat_manager = ChatManager()
+    pipe_utils = PipeUtils(chat_manager)
+    user_input = chat_manager.client_deployer.user_input
+    file = chat_manager.client_deployer.file
+    pipe_content = None
 
-    if sys.stdin.isatty():
-        app = ChatMode(ollama_client, user_input, args.file)
-        app.run()
+    # Determine if input or output is piped
+    stdin_piped = not sys.stdin.isatty()
+    stdout_piped = not sys.stdout.isatty()
+
+    if stdin_piped:
+        # Handle piped input and output
+        chat_manager.ui = None
+        if stdout_piped:
+            pipe_content = asyncio.run(pipe_utils.read_pipe())
+        else:
+            asyncio.run(pipe_utils.run())
+    if stdout_piped:
+        chat_manager.ui = None
+        asyncio.run(chat_manager.deploy_task(user_input,file,pipe_content))
+        print(chat_manager.client.last_response, end="")
     else:
-        ollama_client.render_output = False
-        chat_manager = ChatManager(ollama_client)
-        pipe_utils = PipeUtils(chat_manager)
-        asyncio.run(pipe_utils.run(ollama_client, user_input)) 
+        # Normal interactive mode
+        if chat_manager.ui:
+            chat_manager.ui.run()
 
 if __name__ == "__main__":
     main()
+

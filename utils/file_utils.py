@@ -34,7 +34,7 @@ class FileUtils:
             if not choice:
                 return None
             target = choice
-        await self._print_message(f"\nAnalyzing {target}\n")
+        await self._print_message(f"\nAnalyzing {target}")
 
         if os.path.isfile(target):
             return await self.read_file(target)
@@ -45,7 +45,7 @@ class FileUtils:
 
     async def read_file(self, file_path, root_folder=None):
         """Reads a file if it's safe or has no extension but matches known patterns."""
-        await self._print_message(f"\nReading {file_path}\n")
+        await self._print_message(f"\nReading {file_path}")
         try:
             if not self._is_safe_file(file_path):
                 return f"Skipping file (unsupported): {file_path}"
@@ -149,7 +149,7 @@ class FileUtils:
             root_folder = folder_path
 
         try:
-            await self._print_message(f"\nGenerating structure for {folder_path}\n\n")
+            await self._print_message(f"\nGenerating structure for {folder_path}")
             structure = self.generate_structure(folder_path, root_folder)
             file_contents = "\n### File Contents ###\n"
             
@@ -159,7 +159,7 @@ class FileUtils:
                 for file in files:
                     file_path = os.path.join(root, file)
                     if not any(file.lower().endswith(ext) for ext in self.safe_extensions):
-                        file_contents += f"\n\nSkipping file (unsupported): {file_path}\n\n"
+                        file_contents += f"\nSkipping file (unsupported): {file_path}"
                     else:
                         content = await self.read_file(file_path, root_folder)
                         file_contents += f"\n{content.strip()}\n"

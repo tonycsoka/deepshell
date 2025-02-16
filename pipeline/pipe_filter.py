@@ -2,7 +2,6 @@ import re
 import asyncio
 from config.settings import Mode
 
-
 class PipeFilter:
     def __init__(self, ollama_client):
         self.ollama_client = ollama_client
@@ -14,19 +13,18 @@ class PipeFilter:
 
     async def process_stream(self,extract_code = False):
         """Processes the input stream, handling thoughts and code differently based on config."""
-        self.full_input = []  
-        self.results = []  
+        full_input = "" 
+        results = ""
 
         if extract_code:
             while True:
                 message = await self.input_buffer.get()
                 if message is None:
                   break
-                self.full_input.append(message)  
+                full_input += message
 
-            full_response = "".join(self.full_input)
-            self.ollama_client.last_response = full_response
-            self.extracted_code = await self.extract_code(response=full_response)
+            self.ollama_client.last_response = full_input
+            self.extracted_code = await self.extract_code(response=full_input)
 
             if self.extracted_code:
                 await self.buffer.put(self.extracted_code)  
@@ -40,8 +38,8 @@ class PipeFilter:
             if message is None:
                 break  
 
-            self.full_input.append(message) 
-            output = [] 
+            full_input += message
+            output = "" 
             i = 0
 
             while i < len(message):
@@ -59,22 +57,24 @@ class PipeFilter:
                 if thinking:
                     thought_buffer.append(message[i])
                     if self.ollama_client.show_thinking:
+                        results += message[i]
                         await self.buffer.put(message[i])  
                 else:
-                    output.append(message[i])
+                    output += message[i]
 
                 i += 1
 
-            filtered_message = "".join(output)
-            if filtered_message.strip():
-                self.ollama_client.history.append({"role": "assistant", "content":filtered_message}) 
+            filtered_message = output
+            if filtered_message:
+                results += filtered_message
+              
                 await self.buffer.put(filtered_message) 
 
         # Extract thoughts after streaming
-        full_text = "".join(self.full_input)
+        full_text = full_input
         thoughts = re.findall(r"<think>(.*?)</think>", full_text, flags=re.DOTALL)
-
-        self.ollama_client.last_response = "".join(self.results)
+        self.ollama_client.history.append({"role": "assistant", "content":results})
+        self.ollama_client.last_response = results
         self.ollama_client.last_thoughts = thoughts
 
     async def extract_code(self, response ):

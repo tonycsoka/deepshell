@@ -18,7 +18,7 @@ class OllamaClient:
     def switch_mode(self, mode):
         """Dynamically switches mode and updates config."""
         if mode == self.mode:
-            return  # No need to switch if already in the same mode
+            return
 
         config = MODE_CONFIGS[mode]
         self.model = config["model"]

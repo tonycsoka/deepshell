@@ -4,13 +4,16 @@ from utils.args_utils import parse_args
 from config.settings import *
 
 class ClientDeployer:
-    def __init__(self):
-        self.args = parse_args()  # Get args using your utility function
+    def __init__(self,mode = None):
+        self.args = parse_args()
+        self.user_input = self.args.prompt or self.args.string_input or None
+        self.file = self.args.file
 
-        # Determine mode dynamically
-        self.mode = Mode.SHELL if self.args.shell else Mode.CODE if self.args.code else Mode.DEFAULT
+        if mode:
+            self.mode = mode
+        else:
+            self.mode = Mode.SHELL if self.args.shell else Mode.CODE if self.args.code else Mode.DEFAULT
         
-        # Apply mode-specific settings
         config = MODE_CONFIGS[self.mode]
         self.host = DEFAULT_HOST
         self.model = config["model"]
@@ -18,13 +21,11 @@ class ClientDeployer:
         self.stream = config["stream"]
 
     def deploy(self):
-        # Override values with args if provided
         if self.args.host:
             self.host = self.args.host
         if self.args.model:
             self.model = self.args.model
 
-        # Create and return the OllamaClient instance
         return OllamaClient(
             host=self.host,
             model=self.model,

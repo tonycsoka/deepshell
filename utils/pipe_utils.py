@@ -2,25 +2,26 @@ import asyncio
 import sys
 import shutil
 import textwrap
-from utils.command_processor import CommandProcessor
 
 class PipeUtils:
     def __init__(self, chat_manager):
         self.chat_manager = chat_manager
+        self.processor = chat_manager.command_processor
 
     async def read_pipe(self):
         """Read piped input asynchronously."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, sys.stdin.read)
 
-    async def handle_pipe(self, ollama_client, user_input=None):
+    async def handle_pipe(self):
         """Handles pipe input, formats the user input, and runs the task manager."""
         pipe_input = await self.read_pipe()
+        user_input = self.chat_manager.client_depolyer.user_input
 
         if pipe_input:
             if user_input:
-                processor = CommandProcessor(ollama_client)
-                user_input = processor.format_input(user_input, pipe_input)
+                self.chat_manager.client_depolyer.user_input = None
+                user_input = self.processor.format_input(user_input, pipe_input)
             else:
                 user_input = pipe_input
 
@@ -64,7 +65,7 @@ class PipeUtils:
             await asyncio.sleep(delay)
         print() 
 
-    async def run(self, ollama_client, user_input):
+    async def run(self):
         """Runs the full pipe handling process."""
-        await self.handle_pipe(ollama_client, user_input)
+        await self.handle_pipe()
 
