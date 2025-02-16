@@ -12,7 +12,6 @@ class ChatManager:
         
         if self.client.render_output:
             self.ui = ChatMode(self)
-            print("HUH")
         else:
             self.ui = None
 

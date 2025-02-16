@@ -1,0 +1,24 @@
+/* styles.css */
+
+
+* {
+    color: lime;
+    background: black;
+}
+
+
+Input,
+RichLog {
+    border: darkgreen;
+
+}
+
+
+ScrollView .scrollbar {
+    scrollbar-size: 0 0;
+}
+
+
+
+
+

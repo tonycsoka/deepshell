@@ -9,6 +9,7 @@ from ui.rendering import Rendering
 class ChatMode(App):
     _instance = None
     _initialized: bool = False
+    CSS_PATH = "style.css"
 
     def __new__(cls, *args, **kwargs):
         """Ensure that only one instance of the class exists (Singleton)."""
@@ -26,14 +27,14 @@ class ChatMode(App):
             self.buffer= asyncio.Queue()
             self.rendering = Rendering(self)
             self.system_message = (
-            f"Chat with model: {self.client.model} in {self.client.mode.name} mode.\n\n"
-            "Type 'exit' to quit.\n\n"
+            f"Chat with model: {self.client.model} in {self.client.mode.name} mode.\n"
+            "Type 'exit' to quit.\n"
         )
 
     def compose(self) -> ComposeResult:
         """Create UI layout with a fixed bottom input and scrollable output."""
         yield Vertical(
-            RichLog(highlight=True, markup=True ,id="rich_log"), 
+            RichLog(highlight=True, markup=True,wrap=True ,id="rich_log"), 
             Input(placeholder="Type here and press Enter...", id="input_field")  
         )
 
@@ -42,6 +43,8 @@ class ChatMode(App):
        
         self.rich_log_widget = self.query_one(RichLog)
         self.input_widget = self.query_one(Input)
+        self.rich_log_widget.styles.border = None
+        self.input_widget.styles.border = None
         self.input_widget.focus()
         asyncio.create_task(self.rendering.render_output())
         asyncio.create_task(self.buffer.put(self.system_message))
@@ -77,10 +80,9 @@ class ChatMode(App):
                         self.pswd = None
                     self.exit()
                 else:
-                    asyncio.create_task(self.buffer.put(f"\n[bold green]You:[/bold green] {text}"))
+                    asyncio.create_task(self.buffer.put(f"\n\n[bold red]You: [/bold red][white]{text}[/white]"))
                     self.input_widget.clear()
                     self.input_widget.focus()
-                    asyncio.create_task(self.buffer.put("\n[bold blue]AI:[/bold blue] "))
                     asyncio.create_task(self.manager.deploy_task(text))
 
 
