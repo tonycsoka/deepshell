@@ -1,17 +1,12 @@
 import os
 import re
-import platform
-from config.settings import Mode
 from utils.file_utils import FileUtils
 from utils.shell_utils import CommandExecutor
 
 class CommandProcessor:
     """Handles user input"""
     
-    def __init__(self, client,ui = None):
-        self.client = client
-        self.default_config = client.config
-        self.config = client.config
+    def __init__(self,ui = None):
         self.file_utils = FileUtils(ui)
         self.executor = CommandExecutor(ui)
     
@@ -64,7 +59,5 @@ class CommandProcessor:
         if additional_action:
             user_input = additional_action
         if user_input:
-            if self.client.mode == Mode.SHELL:
-                user_input += f"OS: {platform.uname()}"
-            return f"Prompt:\n{user_input}\n\n{formatted_content}"
+            return f"\n{formatted_content}\nUser Prompt:\n{user_input}\n"
         return formatted_content

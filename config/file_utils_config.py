@@ -16,7 +16,7 @@ SUPPORTED_EXTENSIONS = [
 IGNORED_FOLDERS =  ['__pycache__', '.git', '.svn', '.hg']
 
 #Processing large text files
-MAX_FILE_SIZE = 1 * 1024 * 1024
-MAX_LINES = 300
+MAX_FILE_SIZE = 3 * 1024 * 1024
+MAX_LINES = 600
 CHUNK_SIZE = 4000
 

@@ -1,6 +1,6 @@
 import asyncio
 from ollama import AsyncClient
-from config.settings import Mode, MODE_CONFIGS
+from config.settings import MODE_CONFIGS
 
 class OllamaClient:
     def __init__(self, host, model, config, mode, stream=True, render_output=True, show_thinking=False):
@@ -14,6 +14,7 @@ class OllamaClient:
         self.output_buffer = asyncio.Queue()
         self.history = []
         self.last_response = ""
+        self.init = False
 
     def switch_mode(self, mode):
         """Dynamically switches mode and updates config."""
@@ -39,8 +40,8 @@ class OllamaClient:
             options=self.config,
             stream=self.stream
         ):
-            await self.output_buffer.put(part.get('message', {}).get('content', ''))  # Push raw stream into buffer
-        if self.mode == Mode.SHELL:
-            self.history = []
-        await self.output_buffer.put(None)
+            if not self.init:
+                await self.output_buffer.put(part.get('message', {}).get('content', ''))
+        if not self.init:
+            await self.output_buffer.put(None)
 

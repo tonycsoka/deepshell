@@ -26,8 +26,10 @@ class ChatMode(App):
             self.client = manager.client
             self.buffer= asyncio.Queue()
             self.rendering = Rendering(self)
+            self.fancy_print = self.rendering.fancy_print
+            self.transfer_buffer = self.rendering.transfer_buffer
             self.system_message = (
-            f"Chat with model: {self.client.model} in {self.client.mode.name} mode.\n"
+            f"\nChat with model: {self.client.model} in {self.client.mode.name} mode."
             "Type 'exit' to quit.\n"
         )
 
@@ -38,41 +40,50 @@ class ChatMode(App):
             Input(placeholder="Type here and press Enter...", id="input_field")  
         )
 
-    def on_ready(self) -> None:
+  
+    async def on_ready(self) -> None:
         """Initialize queue and start background listeners."""
-       
+        
+          # Initialize UI widgets and styles
         self.rich_log_widget = self.query_one(RichLog)
         self.input_widget = self.query_one(Input)
         self.rich_log_widget.styles.border = None
         self.input_widget.styles.border = None
         self.input_widget.focus()
-        asyncio.create_task(self.rendering.render_output())
-        asyncio.create_task(self.buffer.put(self.system_message))
 
+        # Start rendering the output in the background
+        asyncio.create_task(self.rendering.render_output())
+        # Initializing client
+        await self.manager.client_init()
+        # Print the system message once the client is initialized
+        asyncio.create_task(self.fancy_print(self.system_message))
         file = None
         user_input = None
+        
         if self.manager.client_deployer.file:
             file = self.manager.client_deployer.file
             self.manager.client_deployer.file = None
+
         if self.manager.client_deployer.user_input:
             user_input = self.manager.client_deployer.user_input
             self.manager.client_deployer.user_input = None
+
+        # Deploy the task with the file and user input if available
         if file or user_input:
-            asyncio.create_task(self.manager.deploy_task(user_input,file))
+            asyncio.create_task(self.manager.deploy_task(user_input, file))
+
         
     async def on_key(self, event: events.Key) -> None:
         """Handles user input from the keyboard."""
         if event.key == "enter":
             text = self.input_widget.value or ""
             text = text.strip()
-            
             # If there's a pending input future (from get_user_input), resolve it and return early.
             if hasattr(self, "input_future") and self.input_future and not self.input_future.done():
                 self.input_future.set_result(text)
                 self.input_widget.clear()
                 self.input_widget.focus()
                 return
-            
             if text:
                 if text.lower() == "exit":
                     if self.pswd:
@@ -96,7 +107,7 @@ class ChatMode(App):
         """Waits for user input asynchronously and returns the value.
         If is_password is True, masks the input like a password.
         """
-        await self.buffer.put(f"\nSystem: {prompt_text}")
+        await self.fancy_print(f"\nSystem: {prompt_text}")
         
         self.input_widget.value = input_text  # Set initial text
         self.input_widget.placeholder = prompt_text
@@ -115,33 +126,6 @@ class ChatMode(App):
             self.input_widget.placeholder = "Type here and press Enter:..."
         
         return user_input
-
-
-    async def fancy_print(self, content):
-        """Handles printing of both plain text and async streams with smooth character flow."""
-        if isinstance(content, asyncio.Queue):
-            while True:
-                chunk = await content.get()
-                if chunk is None:
-                    break
-                await self.buffer.put(chunk)
-        elif hasattr(content, "__aiter__"):
-            async for chunk in content:
-                await self.buffer.put(chunk)
-        else:
-             await self.buffer.put(content)
-                   
-    async def transfer_buffer(self, source_buffer):
-        """
-        Continuously transfer data from the source_buffer (e.g. filtering's buffer)
-        into the UI's rendering buffer, but only if the transfer is enabled.
-        """
-        while True:
-            chunk = await source_buffer.get()
-            if chunk is None:
-                break
-            await self.buffer.put(chunk)
-
 
     async def yes_no_prompt(self,prompt_text):
         """Prompts the user to execute, modify, or cancel a command."""

@@ -12,7 +12,12 @@ class ClientDeployer:
         if mode:
             self.mode = mode
         else:
-            self.mode = Mode.SHELL if self.args.shell else Mode.CODE if self.args.code else Mode.DEFAULT
+            self.mode = (
+                Mode.SHELL if self.args.shell else
+                Mode.CODE if self.args.code else
+                Mode.SYSTEM if self.args.system else
+                Mode.DEFAULT
+            )
         
         config = MODE_CONFIGS[self.mode]
         self.host = DEFAULT_HOST
@@ -36,6 +41,6 @@ class ClientDeployer:
             show_thinking=self.args.thinking
         )
 
-    def generate_config(self, temp=0.7, prompt=DEFAULT):
+    def generate_config(self, temp=0.7, prompt=""):
         return {"temperature": temp, "system": prompt}
 

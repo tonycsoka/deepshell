@@ -1,24 +1,15 @@
-/* styles.css */
-
-
-* {
-    color: lime;
-    background: black;
-}
-
-
 Input,
 RichLog {
-    border: darkgreen;
-
+    border: white;
 }
 
+RichLog:focus {
+    text-style: reverse; 
+    text-style: bold;    
+}
 
 ScrollView .scrollbar {
     scrollbar-size: 0 0;
 }
-
-
-
 
 

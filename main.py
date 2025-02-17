@@ -26,15 +26,17 @@ def main():
     stdin_piped = not sys.stdin.isatty()
     stdout_piped = not sys.stdout.isatty()
 
+    if stdout_piped or stdin_piped:
+        chat_manager.ui = None
+   
+
     if stdin_piped:
         # Handle piped input and output
-        chat_manager.ui = None
         if stdout_piped:
             pipe_content = asyncio.run(pipe_utils.read_pipe())
         else:
             asyncio.run(pipe_utils.run())
     if stdout_piped:
-        chat_manager.ui = None
         asyncio.run(chat_manager.deploy_task(user_input,file,pipe_content))
         print(chat_manager.client.last_response, end="")
     else:

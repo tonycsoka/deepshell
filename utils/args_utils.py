@@ -16,6 +16,7 @@ def parse_args():
     output_group = parser.add_mutually_exclusive_group()
     output_group.add_argument("--code", action="store_true", help="Generate code only")
     output_group.add_argument("--shell", action="store_true", help="Generate shell command")
+    output_group.add_argument("--system", action="store_true", help="System Administration")
     output_group.add_argument("--thinking", action="store_true", help="Show thinking sections")
 
     return parser.parse_args()

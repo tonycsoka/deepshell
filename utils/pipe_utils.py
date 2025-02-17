@@ -16,15 +16,13 @@ class PipeUtils:
     async def handle_pipe(self):
         """Handles pipe input, formats the user input, and runs the task manager."""
         pipe_input = await self.read_pipe()
-        user_input = self.chat_manager.client_depolyer.user_input
+        user_input = self.chat_manager.client_deployer.user_input
 
         if pipe_input:
             if user_input:
-                self.chat_manager.client_depolyer.user_input = None
                 user_input = self.processor.format_input(user_input, pipe_input)
             else:
                 user_input = pipe_input
-
         task_manager_task = asyncio.create_task(self.chat_manager.task_manager(user_input))
         print_task = asyncio.create_task(self.print_from_buffer(task_manager_task))
 
