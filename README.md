@@ -67,6 +67,7 @@ python3 main.py
 - `--file` - Present a document for analysis.
 - `--code` - Extract and manifest the essence of code, carving precise snippets from the chaos around it.
 - `--shell` - Speak your intent in natural language. The AI will translate your command, summon the shell, execute your instructions, and return the output as a real-time, immersive markup analysis.
+- `--system` - The AI whispers through logs and configs, extracting secrets with cold precision, revealing only what’s needed.
 
 **Voice of the Machine: The Art of Commanding its Tongue:**
 Speak in the language of the machine—prefix your words with !, and the AI, attuned to the art of command, will instantly interpret and execute your directive. The system will then return its results, woven into a clean and structured markup response, as if deciphering its own language.
