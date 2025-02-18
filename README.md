@@ -28,7 +28,7 @@ ollama serve
 Prepare the tool for execution:
 
 ```sh
-pip install ollama textual aiofiles
+pip install ollama textual aiofiles python-magic
 ```
 
 Bind DeepSeek-Shell to your system:

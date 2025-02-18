@@ -1,10 +1,9 @@
 import asyncio
-from chatbot import deployer
 from utils.command_processor import CommandProcessor
 from config.system_prompts import *
 from config.settings import Mode
 from ui.ui import ChatMode
-from chatbot.deployer import ChatBotDeployer  # Import the new deployer class
+from chatbot.deployer import ChatBotDeployer
 
 class ChatManager:
     """

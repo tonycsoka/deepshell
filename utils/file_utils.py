@@ -1,6 +1,7 @@
 import os
 import aiofiles
 import asyncio
+import magic
 from ui.popups import RadiolistPopup
 from config.file_utils_config import *
 
@@ -32,9 +33,9 @@ class FileUtils:
         if not os.path.exists(target):
             choice = await self.prompt_search(target)
             if not choice:
-                return None
+                await self._print_message("\n[yellow]Nothing found[/yellow]")
+                return -1
             target = choice
-        await self._print_message(f"\nAnalyzing {target}")
 
         if os.path.isfile(target):
             return await self.read_file(target)
@@ -45,11 +46,10 @@ class FileUtils:
 
     async def read_file(self, file_path, root_folder=None):
         """Reads a file if it's safe or has no extension but matches known patterns."""
-        await self._print_message(f"\nReading {file_path}")
         try:
             if not self._is_safe_file(file_path):
                 return f"Skipping file (unsupported): {file_path}"
-
+            await self._print_message(f"[green]\nReading {file_path}[/green]")
             relative_path = os.path.relpath(file_path, root_folder) if root_folder else file_path
             if os.path.getsize(file_path) > self.max_file_size:
                 content = await self._read_last_n_lines(file_path, self.max_lines)
@@ -63,21 +63,18 @@ class FileUtils:
             return f"Error reading file {file_path}: {e}"
 
     def _is_safe_file(self, file_path):
-        """Check if the file has a safe extension or can be identified as a known text format."""
+        """Return True if the file has a whitelisted extension or is identified as text using python-magic."""
         if any(file_path.lower().endswith(ext) for ext in self.safe_extensions):
             return True  # Extension is whitelisted
 
-        if '.' not in os.path.basename(file_path):  # No extension
-            return self._is_text_file(file_path)  # Try fallback detection
+        # For files not in the whitelist (or without an extension), use python-magic
+        return self._is_text_file(file_path)
 
-        return False  # Unrecognized file type
-
-    def _is_text_file(self, file_path, check_bytes=512):
-        """Try to determine if a file is text-based by reading its first chunk."""
+    def _is_text_file(self, file_path):
+        """Determine if a file is text-based using python-magic."""
         try:
-            with open(file_path, "rb") as f:
-                chunk = f.read(check_bytes)
-                return all(32 <= byte <= 126 or byte in (9, 10, 13) for byte in chunk)  # Basic ASCII/UTF-8 check
+            mime = magic.Magic(mime=True)
+            return mime.from_file(file_path).startswith("text")
         except Exception:
             return False
 
@@ -118,7 +115,6 @@ class FileUtils:
                 return 0
 
 
-
     def generate_structure(self, folder_path, root_folder, prefix=""):
         """
         Generates a textual representation of the folder structure.
@@ -145,11 +141,11 @@ class FileUtils:
            The folder structure is generated for all files; however, only files with safe extensions
            are attempted to be read (others are skipped).
         """
+        await self._print_message(f"[green]\nOpening {folder_path}[/green]")
         if root_folder is None:
             root_folder = folder_path
 
         try:
-            await self._print_message(f"\nGenerating structure for {folder_path}")
             structure = self.generate_structure(folder_path, root_folder)
             file_contents = "\n### File Contents ###\n"
             
@@ -246,7 +242,7 @@ class FileUtils:
 
     async def _print_message(self, message: str):
         """Print messages either through UI or terminal."""
-        if self.ui is not None:
-            await self.ui.fancy_print(message)
+        if self.ui:
+            await self.ui.buffer.put(message)
         else:
             print(message)

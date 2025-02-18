@@ -6,7 +6,7 @@ from utils.shell_utils import CommandExecutor
 class CommandProcessor:
     """Handles user input"""
     
-    def __init__(self,ui = None):
+    def __init__(self, ui=None):
         self.file_utils = FileUtils(ui)
         self.executor = CommandExecutor(ui)
     
@@ -22,6 +22,14 @@ class CommandProcessor:
         if user_input:
             target, additional_action = await self.detect_action(user_input)
             if target:
+                # Ensure "open this folder" works without an additional action
+                if target == os.getcwd():
+                    file_content = await self.file_utils.process_file_or_folder(target)
+                    if file_content == -1:
+                        user_input = None
+                        return None
+                    return file_content or f"Opened folder: {target}"  # Ensure output is returned
+
                 file_content = await self.file_utils.process_file_or_folder(target)
                 if file_content:
                     return self.format_input(user_input, file_content, additional_action)
@@ -33,6 +41,7 @@ class CommandProcessor:
 
     async def detect_action(self, user_input):
         """Detects action and extracts target and additional action."""
+        
         parts = re.split(r"\band\b", user_input, maxsplit=1)
         main_command = parts[0].strip()
         additional_action = parts[1].strip() if len(parts) > 1 else None
@@ -48,10 +57,11 @@ class CommandProcessor:
         target_index = tokens.index(action) + 1
         target = " ".join(tokens[target_index:]) if target_index < len(tokens) else ""
 
-        if target == "this folder":
+        # Ensure "this folder" is properly converted
+        if target.lower() == "this folder":
             target = os.getcwd()
-        return target, additional_action
 
+        return target, additional_action
 
     def format_input(self, user_input, file_content, additional_action=None):
         """Prepares user input by combining prompt and file content."""

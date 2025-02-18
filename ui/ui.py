@@ -88,7 +88,7 @@ class ChatMode(App):
                 if text.lower() == "exit":
                     self.exit_app()
                 else:
-                    asyncio.create_task(self.fancy_print(f"\n\n[bold red]You: [/bold red][white]{text}[/white]"))
+                    await self.fancy_print(f"\n\n[bold red]You: [/bold red][white]{text}[/white]")
                     self.input_widget.clear()
                     self.input_widget.focus()
                     asyncio.create_task(self.manager.deploy_task(text))
@@ -109,7 +109,7 @@ class ChatMode(App):
         """Waits for user input asynchronously and returns the value.
         If is_password is True, masks the input like a password.
         """
-        await self.fancy_print(f"\n[yellow]System: {prompt_text}[/yellow]")
+        await self.fancy_print(f"\nSystem: {prompt_text}")
         
         self.input_widget.value = input_text  # Set initial text
         self.input_widget.placeholder = prompt_text
