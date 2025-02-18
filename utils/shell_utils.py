@@ -11,7 +11,7 @@ class CommandExecutor:
     monitoring execution, and processing command outputs.
     """
 
-    def __init__(self, ui=None, monitor_interval=60, max_output_length=1000, output_validation=True):
+    def __init__(self, ui=None, monitor_interval=90, max_output_length=600, output_validation=True):
         """
         Initializes the CommandExecutor.
         

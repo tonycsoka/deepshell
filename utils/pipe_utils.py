@@ -1,5 +1,5 @@
-import asyncio
 import sys
+import asyncio
 import shutil
 import textwrap
 
@@ -13,10 +13,10 @@ class PipeUtils:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, sys.stdin.read)
 
-    async def handle_pipe(self):
+    async def handle_pipe(self,user_input=None):
         """Handles pipe input, formats the user input, and runs the task manager."""
         pipe_input = await self.read_pipe()
-        user_input = self.chat_manager.client_deployer.user_input
+
 
         if pipe_input:
             if user_input:
@@ -63,7 +63,6 @@ class PipeUtils:
             await asyncio.sleep(delay)
         print() 
 
-    async def run(self):
+    async def run(self,user_input = None):
         """Runs the full pipe handling process."""
-        await self.handle_pipe()
-
+        await self.handle_pipe(user_input)

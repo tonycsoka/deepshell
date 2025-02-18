@@ -4,6 +4,7 @@ from utils.args_utils import parse_args
 from config.settings import *
 
 class ClientDeployer:
+    """Deploys an isntance of Ollama API Client"""
     def __init__(self,mode = None):
         self.args = parse_args()
         self.user_input = self.args.prompt or self.args.string_input or None

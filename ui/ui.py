@@ -1,3 +1,4 @@
+import sys
 import asyncio
 import secrets
 from textual.app import App, ComposeResult
@@ -17,7 +18,7 @@ class ChatMode(App):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, manager):
+    def __init__(self, manager,user_input=None,file=None,file_content=None):
             super().__init__() 
             if self._initialized:
                 return
@@ -28,9 +29,11 @@ class ChatMode(App):
             self.rendering = Rendering(self)
             self.fancy_print = self.rendering.fancy_print
             self.transfer_buffer = self.rendering.transfer_buffer
+            self.user_input, self.file, self.file_content = user_input,file,file_content
             self.system_message = (
-            f"\nChat with model: {self.client.model} in {self.client.mode.name} mode."
-            "Type 'exit' to quit.\n"
+            f"[green]Chat with model: {self.client.model} in {self.client.mode.name} mode."
+            " Type 'exit'or press Ctrl+C to quit.[/green]\n"
+
         )
 
     def compose(self) -> ComposeResult:
@@ -57,24 +60,21 @@ class ChatMode(App):
         await self.manager.client_init()
         # Print the system message once the client is initialized
         asyncio.create_task(self.fancy_print(self.system_message))
-        file = None
-        user_input = None
-        
-        if self.manager.client_deployer.file:
-            file = self.manager.client_deployer.file
-            self.manager.client_deployer.file = None
-
-        if self.manager.client_deployer.user_input:
-            user_input = self.manager.client_deployer.user_input
-            self.manager.client_deployer.user_input = None
-
         # Deploy the task with the file and user input if available
-        if file or user_input:
-            asyncio.create_task(self.manager.deploy_task(user_input, file))
+        if self.user_input or self.file or self.file_content:
+            if self.file_content:
+                sys.stdin = open("/dev/tty", 'r')
+                # until a way to switch will be revealed in a dream
+                self.input_widget.disabled = True
+            asyncio.create_task(self.manager.deploy_task(self.user_input, self.file,self.file_content))
+            self.user_input,self.file,self.file_content = None,None,None
 
         
     async def on_key(self, event: events.Key) -> None:
         """Handles user input from the keyboard."""
+        if event.key =="ctrl+c":
+            self.exit_app()
+
         if event.key == "enter":
             text = self.input_widget.value or ""
             text = text.strip()
@@ -86,16 +86,18 @@ class ChatMode(App):
                 return
             if text:
                 if text.lower() == "exit":
-                    if self.pswd:
-                        self.pswd = secrets.token_urlsafe(32)
-                        self.pswd = None
-                    self.exit()
+                    self.exit_app()
                 else:
-                    asyncio.create_task(self.buffer.put(f"\n\n[bold red]You: [/bold red][white]{text}[/white]"))
+                    asyncio.create_task(self.fancy_print(f"\n\n[bold red]You: [/bold red][white]{text}[/white]"))
                     self.input_widget.clear()
                     self.input_widget.focus()
                     asyncio.create_task(self.manager.deploy_task(text))
 
+    def exit_app(self):
+        if self.pswd:
+            self.pswd = secrets.token_urlsafe(32)
+            self.pswd = None
+        self.exit()
 
     def wait_for_input(self):
         """Helper method to wait for input asynchronously."""
@@ -107,7 +109,7 @@ class ChatMode(App):
         """Waits for user input asynchronously and returns the value.
         If is_password is True, masks the input like a password.
         """
-        await self.fancy_print(f"\nSystem: {prompt_text}")
+        await self.fancy_print(f"\n[yellow]System: {prompt_text}[/yellow]")
         
         self.input_widget.value = input_text  # Set initial text
         self.input_widget.placeholder = prompt_text
@@ -141,9 +143,5 @@ class ChatMode(App):
                     return False
 
             else:
-                await self.buffer.put("\nIt is a Yes or No question.")
-
-
-
-
+                await self.fancy_print("\nIt is a Yes or No question.")
 
