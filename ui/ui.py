@@ -31,8 +31,8 @@ class ChatMode(App):
             self.transfer_buffer = self.rendering.transfer_buffer
             self.user_input, self.file, self.file_content = user_input,file,file_content
             self.system_message = (
-            f"[green]Chat with model: {self.client.model} in {self.client.mode.name} mode."
-            " Type 'exit'or press Ctrl+C to quit.[/green]\n"
+            f"[green]Chat with: [cyan]{self.client.model}[/cyan] in [cyan]{self.client.mode.name}[/cyan] mode."
+            " Type [red]exit[/red] or press [red]Ctrl+C[/red] to quit.[/green]\n"
 
         )
 
@@ -43,7 +43,6 @@ class ChatMode(App):
             Input(placeholder="Type here and press Enter...", id="input_field")  
         )
 
-  
     async def on_ready(self) -> None:
         """Initialize queue and start background listeners."""
         
@@ -68,7 +67,6 @@ class ChatMode(App):
                 self.input_widget.disabled = True
             asyncio.create_task(self.manager.deploy_task(self.user_input, self.file,self.file_content))
             self.user_input,self.file,self.file_content = None,None,None
-
         
     async def on_key(self, event: events.Key) -> None:
         """Handles user input from the keyboard."""
@@ -103,7 +101,6 @@ class ChatMode(App):
         """Helper method to wait for input asynchronously."""
         self.input_future = asyncio.Future()
         return self.input_future
-
 
     async def get_user_input(self, prompt_text: str = "Enter input:", input_text: str = "", is_password: bool = False):
         """Waits for user input asynchronously and returns the value.
@@ -144,4 +141,3 @@ class ChatMode(App):
 
             else:
                 await self.fancy_print("\nIt is a Yes or No question.")
-
