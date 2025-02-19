@@ -21,11 +21,13 @@ class ChatBotDeployer:
             chatbot.switch_mode(mode)
         return chatbot, PipeFilter(chatbot)
 
-    def _initialize_shell_mode(self):
+    def _initialize_shell_mode(self,chatbot,chatbot_filter):
         """
         Initializes SHELL mode by deploying both a SYSTEM listener and a SHELL generator.
         """
-        listener, listener_filter = self.deploy_chatbot(Mode.SYSTEM)  # SYSTEM chatbot (listener)
+
+        listener, listener_filter = chatbot, chatbot_filter
+        listener.switch_mode(Mode.SYSTEM)# SYSTEM chatbot (listener)
         generator, generator_filter = self.deploy_chatbot(Mode.SHELL)  # SHELL chatbot (generator)
 
         listener.keep_history = False
@@ -44,7 +46,7 @@ class ChatBotDeployer:
             await self.ui.fancy_print("[yellow]Initializing chatbot, please wait...[/yellow]\n")
 
         if mode == Mode.SHELL:
-            return self._initialize_shell_mode()
+            return self._initialize_shell_mode(chatbot,chatbot_filter)
 
         return chatbot, chatbot_filter
 
