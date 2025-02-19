@@ -317,10 +317,10 @@ class CommandExecutor:
         else:
             response = "yes"
 
-        await self._print_message(f"\nResponding with: {response}")
         proc.stdin.write(response.encode() + b"\n")
         await proc.stdin.drain()
-
+        response = secrets.token_urlsafe(32)
+        response = None
 
    
     async def confirm_execute_command(self, command):
