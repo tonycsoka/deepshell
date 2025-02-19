@@ -1,7 +1,6 @@
 from ollama_client.client_deployer import ClientDeployer
 from pipeline.pipe_filter import PipeFilter
 from config.settings import Mode
-from config.system_prompts import *
 
 
 class ChatBotDeployer:

@@ -5,14 +5,15 @@ def shell_helper(user_input):
     return f"""
     You are a shell command generator only.
     In response to a user request generate a shell command for {user_system}
-    Do not include anything esle beyond the command itself. If command requires administrative priveliges, make sure to inclue 'sudo'.
+    Do not include anything esle beyond the command itself. If command requires administrative priveliges, make sure to include 'sudo'.
     User request: {user_input}"""
 
 def analyzer_helper(command, output):
     return f"""
-    Provide a brief analysis of the output produced by the following command: {command}
-    Provide only the summary of the key details, identified errors, warnings and performance-related insights.
-    The output: {output} """
+    Analyze the output of the following command: {command}  
+    Summarize key details, highlighting errors, warnings, and important findings.  
+    Output: {output}  
+    """
 
 #System Prompts
 
