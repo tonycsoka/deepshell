@@ -54,7 +54,6 @@ class ChatManager:
         mode_handlers = {
             Mode.SHELL: lambda input: self._handle_shell_mode(input, bypass),
             Mode.CODE: self._handle_code_mode,
-        
         }
         
         if bypass:
@@ -71,23 +70,24 @@ class ChatManager:
         """
         if not bypass:
             input = await self._handle_code_mode(shell_helper(input), no_render=True)
-            output = await self.executor.start(input)
+            input, output = await self.executor.start(input)
 
             if output:
                 if self.ui and await self.ui.yes_no_prompt("\nDo you want to see the output?\n(Y)es or (No)\n"):
                     await self.ui.buffer.put(output)
                 output = analyzer_helper(input,output)
-                await self._handle_listener(output)
+                await self._handle_default_mode(output, client=self.listener,filtering=self.listener_filter)            
             else:
                 if self.ui:
                     await self.ui.fancy_print("\nNo output detected...\n")
         else:
             output = await self.executor.execute_command(input)
+
             if output:
                 if self.ui and await self.ui.yes_no_prompt("\nDo you want to see the output?\n (Y)es or (No)\n"):
                     await self.ui.buffer.put(output)
                 output = analyzer_helper(input,output)
-                await self._handle_listener(output) if self.client.mode != Mode.DEFAULT else await self._handle_default_mode(output)
+                await self._handle_default_mode(output, client=self.listener,filtering=self.listener_filter) if self.client.mode != Mode.DEFAULT else await self._handle_default_mode(output)
             else:
                 if self.ui:
                     await self.ui.fancy_print("\nNo output detected...\n")
@@ -111,35 +111,38 @@ class ChatManager:
         self.tasks = []
         return code
 
-    async def _handle_default_mode(self, input, no_render=False):
+    async def _handle_default_mode(self, input, no_render=False, client = None, filtering = None):
         """
         Handles tasks when the client is in the default mode.
         """
-        get_stream = asyncio.create_task(self.client._chat_stream(input))
-        process_text = asyncio.create_task(self.filtering.process_stream(False))
+        if not client or not filtering:
+            client = self.client
+            filtering = self.filtering
+        get_stream = asyncio.create_task(client._chat_stream(input))
+        process_text = asyncio.create_task(filtering.process_stream(False))
         self.tasks = [get_stream, process_text]
 
         if self.ui and not no_render:
-            rendering_task = asyncio.create_task(self.ui.transfer_buffer(self.filtering.buffer))
+            rendering_task = asyncio.create_task(self.ui.transfer_buffer(filtering.buffer))
             self.tasks.append(rendering_task)
 
         await asyncio.gather(*self.tasks)
         self.tasks = []
-        return self.client.last_response
+        return client.last_response
 
-    async def _handle_listener(self, input, no_render=False):
-        """
-        Handles tasks when the client is in listener mode.
-        """
-        if self.listener and self.listener_filter:
-            get_stream = asyncio.create_task(self.listener._chat_stream(input))
-            process_text = asyncio.create_task(self.listener_filter.process_stream(False))
-            self.tasks = [get_stream, process_text]
-
-            if self.ui and not no_render:
-                rendering_task = asyncio.create_task(self.ui.transfer_buffer(self.listener_filter.buffer))
-                self.tasks.append(rendering_task)
-
-            await asyncio.gather(*self.tasks)
-            self.tasks = []
-            return self.listener.last_response
+    # async def _handle_listener(self, input, no_render=False):
+    #     """
+    #     Handles tasks when the client is in listener mode.
+    #     """
+    #     if self.listener and self.listener_filter:
+    #         get_stream = asyncio.create_task(self.listener._chat_stream(input))
+    #         process_text = asyncio.create_task(self.listener_filter.process_stream(False))
+    #         self.tasks = [get_stream, process_text]
+    #
+    #         if self.ui and not no_render:
+    #             rendering_task = asyncio.create_task(self.ui.transfer_buffer(self.listener_filter.buffer))
+    #             self.tasks.append(rendering_task)
+    #
+    #         await asyncio.gather(*self.tasks)
+    #         self.tasks = []
+    #         return self.listener.last_response

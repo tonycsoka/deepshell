@@ -10,7 +10,7 @@ class CommandExecutor:
     monitoring execution, and processing command outputs.
     """
 
-    def __init__(self, ui=None, monitor_interval=90, max_output_length=600, output_validation=True):
+    def __init__(self, ui=None, monitor_interval=60, max_output_length=600, output_validation=True):
         """
         Initializes the CommandExecutor.
         
@@ -29,6 +29,8 @@ class CommandExecutor:
         if self.ui:
             self.sudo_password = self.ui.pswd
 
+  
+   
     async def start(self, command=None):
         """
         Starts execution of the given command.
@@ -37,14 +39,19 @@ class CommandExecutor:
             command (str, optional): The command to execute.
         
         Returns:
-            str: The command output or an error message.
+            tuple: (confirmed_command, command output or error message)
         """
+        confirmed_command = None
+        output = "No command specified."
+
         if command:
             confirmed_command = await self.confirm_execute_command(command)
             if confirmed_command:
-                return await self.execute_command(confirmed_command)
-        else:
-            await self._print_message("No command specified.")
+                output = await self.execute_command(confirmed_command)
+
+        return confirmed_command or "", output  # Ensure a valid tuple is always returned
+
+
 
     async def execute_command(self, command):
         """
