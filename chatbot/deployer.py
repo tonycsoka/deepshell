@@ -1,8 +1,8 @@
-import asyncio
 from ollama_client.client_deployer import ClientDeployer
 from pipeline.pipe_filter import PipeFilter
 from config.settings import Mode
 from config.system_prompts import *
+
 
 class ChatBotDeployer:
     """
@@ -21,49 +21,31 @@ class ChatBotDeployer:
             chatbot.switch_mode(mode)
         return chatbot, PipeFilter(chatbot)
 
-    async def _initialize_shell_mode(self, chatbot):
+    def _initialize_shell_mode(self):
         """
-        Handles initialization for SHELL mode by deploying a listener and running both tasks.
+        Initializes SHELL mode by deploying both a SYSTEM listener and a SHELL generator.
         """
-        listener, listener_filter = self.deploy_chatbot(Mode.SYSTEM)
-        listener.init = True
+        listener, listener_filter = self.deploy_chatbot(Mode.SYSTEM)  # SYSTEM chatbot (listener)
+        generator, generator_filter = self.deploy_chatbot(Mode.SHELL)  # SHELL chatbot (generator)
 
-        analyzer_task = asyncio.create_task(listener._chat_stream(SYSTEM))
-        await asyncio.sleep(1)
-        generator_task = asyncio.create_task(chatbot._chat_stream(SHELL))
+        listener.keep_history = False
+        generator.keep_history = False
 
-        await asyncio.gather(analyzer_task, generator_task)
-        listener.init = False
-
-        return listener, listener_filter
+        return generator, generator_filter, listener, listener_filter
 
     async def chatbot_init(self):
         """
         Initializes the chatbot based on its mode.
         """
         chatbot, chatbot_filter = self.deploy_chatbot()
-        chatbot.init = True
         mode = chatbot.mode
 
         if self.ui:
             await self.ui.fancy_print("[yellow]Initializing chatbot, please wait...[/yellow]\n")
 
-        # Ensure `listener` and `listener_filter` are always initialized
-        listener, listener_filter = None, None  
+        if mode == Mode.SHELL:
+            return self._initialize_shell_mode()
 
-        mode_handlers = {
-            Mode.SHELL: self._initialize_shell_mode,
-            Mode.CODE: chatbot._chat_stream,
-            Mode.SYSTEM: chatbot._chat_stream,
-        }
-
-        if mode in mode_handlers:
-            if mode == Mode.SHELL:
-                listener, listener_filter = await mode_handlers[mode](chatbot)
-            else:
-                await mode_handlers[mode](mode)
+        return chatbot, chatbot_filter
 
 
-        chatbot.init = False
-
-        return (chatbot, chatbot_filter, listener, listener_filter) if listener is not None else (chatbot, chatbot_filter)

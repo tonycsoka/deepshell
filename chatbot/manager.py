@@ -1,6 +1,6 @@
 import asyncio
 from utils.command_processor import CommandProcessor
-from config.system_prompts import *
+from config.system_prompts import shell_helper, analyzer_helper
 from config.settings import Mode
 from ui.ui import ChatMode
 from chatbot.deployer import ChatBotDeployer
@@ -70,12 +70,13 @@ class ChatManager:
         Handles tasks when the client is in SHELL mode.
         """
         if not bypass:
-            input = await self._handle_code_mode(input, no_render=True)
+            input = await self._handle_code_mode(shell_helper(input), no_render=True)
             output = await self.executor.start(input)
 
             if output:
-                if self.ui and await self.ui.yes_no_prompt("\nDo you want to see the output?\n (Y)es or (No)\n"):
+                if self.ui and await self.ui.yes_no_prompt("\nDo you want to see the output?\n(Y)es or (No)\n"):
                     await self.ui.buffer.put(output)
+                output = analyzer_helper(input,output)
                 await self._handle_listener(output)
             else:
                 if self.ui:
@@ -85,6 +86,7 @@ class ChatManager:
             if output:
                 if self.ui and await self.ui.yes_no_prompt("\nDo you want to see the output?\n (Y)es or (No)\n"):
                     await self.ui.buffer.put(output)
+                output = analyzer_helper(input,output)
                 await self._handle_listener(output) if self.client.mode != Mode.DEFAULT else await self._handle_default_mode(output)
             else:
                 if self.ui:
@@ -97,7 +99,6 @@ class ChatManager:
         """
         Handles tasks when the client is in CODE mode.
         """
-       
         get_stream = asyncio.create_task(self.client._chat_stream(input))
         process_text = asyncio.create_task(self.filtering.process_stream(True))
         self.tasks = [get_stream, process_text]
@@ -141,6 +142,4 @@ class ChatManager:
 
             await asyncio.gather(*self.tasks)
             self.tasks = []
-            self.listener.history.pop()
-            self.listener.history.pop()
             return self.listener.last_response

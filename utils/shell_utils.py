@@ -1,4 +1,3 @@
-import sys
 import asyncio
 import secrets
 import string
@@ -133,6 +132,7 @@ class CommandExecutor:
         )
 
 
+   
     async def _process_command_output(self, proc, command):
         """
         Processes the output of a running command.
@@ -154,13 +154,15 @@ class CommandExecutor:
                     break
                 decoded_line = line.decode("utf-8", errors="ignore").strip()
 
-                # Attempt to extract meaningful text even if the output contains non-text data
+                # Extract meaningful text
                 extracted_text = self._extract_meaningful_text(decoded_line)
                 if extracted_text:
                     output_lines.append(extracted_text)
 
+                # Handle potential user prompts
                 if self._should_handle_prompt(decoded_line):
                     await self._handle_prompt(proc, decoded_line)
+
         except asyncio.CancelledError:
             proc.terminate()
             await proc.wait()
@@ -168,12 +170,13 @@ class CommandExecutor:
         finally:
             monitor_task.cancel()
 
-        # Check if any output was received
+        # Validate if we received output
         if not output_lines:
             output_lines.append("No output received. Command may require user interaction or is piped.")
 
         output, error = await proc.communicate()
         return await self._finalize_command_output(proc, command, output_lines, output, error)
+
 
     def _extract_meaningful_text(self, data):
         """
@@ -216,10 +219,10 @@ class CommandExecutor:
                 proc.terminate()
                 break
 
+    
     async def _finalize_command_output(self, proc, command, output_lines, output, error):
         """
-        Processes the final output of a command execution, including error handling 
-        and history storage. Truncates output if it exceeds the maximum length.
+        Finalizes the command output, ensuring truncation if too long and handling errors.
         
         Args:
             proc (asyncio.subprocess.Process): The completed process.
@@ -231,18 +234,22 @@ class CommandExecutor:
         Returns:
             str: The final output or an error message if the command failed.
         """
-        
+
         additional_output = output.decode("utf-8", errors="ignore").strip() if output else ""
         output_str = "\n".join(output_lines)
         if additional_output:
             output_str += "\n" + additional_output
 
         error_str = error.decode("utf-8", errors="ignore").strip() if error else ""
-        
+
+        # Validate if we received output
+        if not output_str.strip():
+            output_str = "No output received. Command may require user interaction or is piped."
+
         # Truncate output if it's too big
         if len(output_str) > self.max_output_length:
             output_str = output_str[:self.max_output_length] + "\n[Output truncated]"
-        
+
         self.history.append({"command": command, "output": output_str, "error": error_str})
         self._clear_sudo_password()
 
@@ -282,6 +289,7 @@ class CommandExecutor:
 
         return True 
 
+   
     def _should_handle_prompt(self, decoded_line):
         """
         Checks if a command output line contains a user prompt requiring a response.
@@ -292,8 +300,10 @@ class CommandExecutor:
         Returns:
             bool: True if the line contains a recognized prompt, False otherwise.
         """
-        return any(kw in decoded_line.lower() for kw in ["[y/n]", "(yes/no)", "(y/n)"])
+        return any(kw in decoded_line.lower() for kw in ["[y/n]", "(yes/no)", "(y/n)", "password:", "continue?"])
 
+
+   
     async def _handle_prompt(self, proc, decoded_line):
         """
         Detects and responds to command-line prompts automatically.
@@ -302,16 +312,15 @@ class CommandExecutor:
             proc (asyncio.subprocess.Process): The process awaiting input.
             decoded_line (str): The prompt message from the command output.
         """
-        user_response = "yes"
-        if sys.stdin and sys.stdin.isatty():
-            user_response = await self._get_user_input(f"{decoded_line} ", is_password=False)
-        if user_response.lower() in ["y", "yes"]:
-            await self._print_message("\nSending 'yes'...")
-            proc.stdin.write(b"yes\n")
+        if "password:" in decoded_line.lower():
+            response = self.sudo_password or await self._get_user_input("Enter password: ", is_password=True)
         else:
-            await self._print_message("\nSending 'no'...")
-            proc.stdin.write(b"no\n")
+            response = "yes"
+
+        await self._print_message(f"\nResponding with: {response}")
+        proc.stdin.write(response.encode() + b"\n")
         await proc.stdin.drain()
+
 
    
     async def confirm_execute_command(self, command):

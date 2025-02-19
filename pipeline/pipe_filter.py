@@ -67,13 +67,14 @@ class PipeFilter:
             filtered_message = output
             if filtered_message:
                 results += filtered_message
-              
+
                 await self.buffer.put(filtered_message) 
 
         # Extract thoughts after streaming
         full_text = full_input
         thoughts = re.findall(r"<think>(.*?)</think>", full_text, flags=re.DOTALL)
-        self.ollama_client.history.append({"role": "assistant", "content":results})
+        if self.ollama_client.keep_history:
+            self.ollama_client.history.append({"role": "assistant", "content":results})
         self.ollama_client.last_response = results
         self.ollama_client.last_thoughts = thoughts
 

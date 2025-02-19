@@ -12,9 +12,10 @@ class OllamaClient:
         self.render_output = render_output
         self.show_thinking = show_thinking
         self.output_buffer = asyncio.Queue()
+        self.keep_history = True
         self.history = []
         self.last_response = ""
-        self.init = False
+        self.pause_stream = False
 
     def switch_mode(self, mode):
         """Dynamically switches mode and updates config."""
@@ -31,17 +32,22 @@ class OllamaClient:
 
     async def _chat_stream(self, input):
         """Fetches response from the Ollama API and streams into output buffer."""
-       
-        self.history.append({"role": "user", "content": input})
+
+        input = {"role": "user", "content": input}
+        if self.keep_history:
+            self.history.append(input)
+            input = self.history
+        else:
+            input = [input]
 
         async for part in await self.client.chat(
             model=self.model,
-            messages=self.history,
+            messages=input,
             options=self.config,
             stream=self.stream
         ):
-            if not self.init:
+            if not self.pause_stream:
                 await self.output_buffer.put(part.get('message', {}).get('content', ''))
-        if not self.init:
+        if not self.pause_stream:
             await self.output_buffer.put(None)
 

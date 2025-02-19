@@ -1,4 +1,4 @@
-from config.system_prompts import *
+from config.system_prompts import CODE,SHELL,SYSTEM
 from enum import Enum, auto
 
 class Mode(Enum):
