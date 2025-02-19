@@ -126,18 +126,21 @@ class ChatMode(App):
         
         return user_input
 
-    async def yes_no_prompt(self,prompt_text):
-        """Prompts the user to execute, modify, or cancel a command."""
+   
+    async def yes_no_prompt(self, prompt_text, default=None):
+        """Prompts the user to execute, modify, or cancel a command with an optional default."""
+        valid_defaults = {"yes": True, "y": True, "no": False, "n": False}
+        
         while True:
             choice = await self.get_user_input(prompt_text=prompt_text)
+
+            if not choice and default:
+                return valid_defaults.get(default.strip().lower(), None)  # Use default if valid
+
             if choice:
                 choice = choice.strip().lower()
+                if choice in valid_defaults:
+                    return valid_defaults[choice]
 
-                if choice in ("yes", "y"):
-                    return True  
-       
-                elif choice in ("no","n"):
-                    return False
+            await self.fancy_print("\nIt is a Yes or No question.")
 
-            else:
-                await self.fancy_print("\nIt is a Yes or No question.")

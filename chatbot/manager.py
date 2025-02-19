@@ -64,6 +64,7 @@ class ChatManager:
         else:
             return await self._handle_default_mode(user_input)
 
+
     async def _handle_shell_mode(self, input, bypass=False):
         """
         Handles tasks when the client is in SHELL mode.
@@ -71,29 +72,25 @@ class ChatManager:
         if not bypass:
             input = await self._handle_code_mode(shell_helper(input), no_render=True)
             input, output = await self.executor.start(input)
-
-            if output:
-                if self.ui and await self.ui.yes_no_prompt("\nDo you want to see the output?\n(Y)es or (No)\n"):
-                    await self.ui.buffer.put(output)
-                output = analyzer_helper(input,output)
-                await self._handle_default_mode(output, client=self.listener,filtering=self.listener_filter)            
-            else:
-                if self.ui:
-                    await self.ui.fancy_print("\nNo output detected...\n")
         else:
             output = await self.executor.execute_command(input)
 
-            if output:
-                if self.ui and await self.ui.yes_no_prompt("\nDo you want to see the output?\n (Y)es or (No)\n"):
-                    await self.ui.buffer.put(output)
-                output = analyzer_helper(input,output)
-                await self._handle_default_mode(output, client=self.listener,filtering=self.listener_filter) if self.client.mode != Mode.DEFAULT else await self._handle_default_mode(output)
+        if output:
+            if self.ui and await self.ui.yes_no_prompt("\nDo you want to see the output?\n(Y)es or (No)-default\n", default="no"):
+                await self.ui.buffer.put(output)
+
+            output = analyzer_helper(input, output)
+            if self.client.mode != Mode.DEFAULT:
+                await self._handle_default_mode(output, client=self.listener, filtering=self.listener_filter)
             else:
-                if self.ui:
-                    await self.ui.fancy_print("\nNo output detected...\n")
+                await self._handle_default_mode(output)
+        else:
+            if self.ui:
+                await self.ui.fancy_print("\nNo output detected...\n")
 
         self.client.last_response = ""
         self.filtering.extracted_code = ""
+
 
     async def _handle_code_mode(self, input, no_render=False):
         """
