@@ -76,7 +76,7 @@ class ChatManager:
             output = await self.executor.execute_command(input)
 
         if output:
-            if self.ui and await self.ui.yes_no_prompt("\nDo you want to see the output?\n(Y)es or (No)-default\n", default="no"):
+            if self.ui and await self.ui.yes_no_prompt("Do you want to see the output?", default="No"):
                 await self.ui.buffer.put(output)
 
             output = analyzer_helper(input, output)

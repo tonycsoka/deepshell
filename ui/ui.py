@@ -32,7 +32,7 @@ class ChatMode(App):
             self.user_input, self.file, self.file_content = user_input,file,file_content
             self.system_message = (
             f"[green]Chat with: [cyan]{self.client.model}[/cyan] in [cyan]{self.client.mode.name}[/cyan] mode."
-            " Type [red]exit[/red] or press [red]Ctrl+C[/red] to quit.[/green]\n"
+            "\nType [red]exit[/red] or press [blue]Ctrl+C[/blue] to quit.[/green]\n"
 
         )
 
@@ -106,7 +106,7 @@ class ChatMode(App):
         """Waits for user input asynchronously and returns the value.
         If is_password is True, masks the input like a password.
         """
-        await self.fancy_print(f"\nSystem: {prompt_text}")
+        await self.fancy_print(f"\n[cyan]System:[/cyan] {prompt_text}")
         
         self.input_widget.value = input_text  # Set initial text
         self.input_widget.placeholder = prompt_text
@@ -127,9 +127,23 @@ class ChatMode(App):
         return user_input
 
    
-    async def yes_no_prompt(self, prompt_text, default=None):
-        """Prompts the user to execute, modify, or cancel a command with an optional default."""
+    async def yes_no_prompt(self, prompt_text, default="yes"):
+        """Prompts the user with yes or no with an optional default."""
+        
         valid_defaults = {"yes": True, "y": True, "no": False, "n": False}
+
+        if default.strip().lower() == "yes":
+            color = "green"
+        elif default.strip().lower() == "no":
+            color = "red"
+        else:
+            color = "white"
+
+        prompt_text = (
+        f"{prompt_text}\n"
+        "[green]Yes[/green] or [red]No[/red]?\n"
+        f"Press [blue]Enter[/blue] for a quick [{color}]{default}[/{color}]\n"
+        )
         
         while True:
             choice = await self.get_user_input(prompt_text=prompt_text)
@@ -142,5 +156,5 @@ class ChatMode(App):
                 if choice in valid_defaults:
                     return valid_defaults[choice]
 
-            await self.fancy_print("\nIt is a Yes or No question.")
+            await self.fancy_print("\n[cyan]System: [/cyan] It is a [green]Yes[/green] or [red]No[/red] question.")
 
