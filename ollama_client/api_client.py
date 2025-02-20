@@ -30,7 +30,6 @@ class OllamaClient:
         self.mode = mode
         self.history.clear()
 
-
     async def _chat_stream(self, input):
         """Fetches response from the Ollama API and streams into output buffer."""
 
@@ -67,3 +66,14 @@ class OllamaClient:
             content = message_data.get('content')
             return content if isinstance(content, str) else "No content found"
 
+    async def _fetch_response(self, message):
+       
+        message = {'role': 'user', 'content': message}
+        response = await AsyncClient().chat(model=self.model, messages=[message])
+            
+        message_data = response.get('message')
+        if not message_data:
+            return "No message in response"
+
+        content = message_data.get('content')
+        return content if isinstance(content, str) else "No content found"
