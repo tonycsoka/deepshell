@@ -1,6 +1,7 @@
 import asyncio
 from ollama import AsyncClient
-from config.settings import MODE_CONFIGS
+from config.settings import MODE_CONFIGS, Mode
+
 
 class OllamaClient:
     def __init__(self, host, model, config, mode, stream=True, render_output=True, show_thinking=False):
@@ -50,4 +51,19 @@ class OllamaClient:
                 await self.output_buffer.put(part.get('message', {}).get('content', ''))
         if not self.pause_stream:
             await self.output_buffer.put(None)
+
+    async def _describe_image(self, image: str | None):
+        if not image:
+            return "No image provided"
+
+        if self.mode == Mode.VISION:
+            message = {'role': 'user', 'content': 'Describe this image', 'images': [image]}
+            response = await AsyncClient().chat(model=self.model, messages=[message])
+            
+            message_data = response.get('message')
+            if not message_data:
+                return "No message in response"
+
+            content = message_data.get('content')
+            return content if isinstance(content, str) else "No content found"
 

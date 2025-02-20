@@ -2,20 +2,16 @@ import os
 import aiofiles
 import asyncio
 import magic
+import base64
+from io import BytesIO
+from PIL import Image
 from ui.popups import RadiolistPopup
 from config.file_utils_config import *
+from chatbot.deployer import ChatBotDeployer
+from config.settings import Mode
 
 class FileUtils:
     def __init__(self, ui=None, safe_extensions=None, ignore_folders=None, scan_dot_folders=False):
-        """
-        Initializes the FileUtils with options.
-
-        :param ui: A UI object (optional).
-        :param safe_extensions: List of file extensions that are allowed.
-               If not provided, a default whitelist is used.
-        :param ignore_folders: List of folder names to ignore.
-        :param scan_dot_folders: Whether to scan hidden folders (starting with a dot). Default is False.
-        """
         self.ui = ui
         self.default_safe_extensions = SUPPORTED_EXTENSIONS
         self.safe_extensions = safe_extensions or self.default_safe_extensions
@@ -25,9 +21,11 @@ class FileUtils:
         self.max_file_size = MAX_FILE_SIZE
         self.max_lines = MAX_LINES
         self.chunk_size = CHUNK_SIZE
+        if PROCESS_IMAGES:
+            deployer = ChatBotDeployer()
+            self.image_processor, _ = deployer.deploy_chatbot(Mode.VISION)
 
     async def process_file_or_folder(self, target):
-        """Handles file or folder operations.""" 
         target = target.strip()
        
         if not os.path.exists(target):
@@ -45,11 +43,18 @@ class FileUtils:
         return None
 
     async def read_file(self, file_path, root_folder=None):
-        """Reads a file if it's safe or has no extension but matches known patterns."""
         try:
+            if self.image_processor:
+                if self._is_image(file_path):
+
+                    await self._print_message(f"[green]\nProcessing the image: {file_path}[/green]")
+                    return await self._process_image(file_path)
+
             if not self._is_safe_file(file_path):
                 return f"Skipping file (unsupported): {file_path}"
+
             await self._print_message(f"[green]\nReading {file_path}[/green]")
+            
             relative_path = os.path.relpath(file_path, root_folder) if root_folder else file_path
             if os.path.getsize(file_path) > self.max_file_size:
                 content = await self._read_last_n_lines(file_path, self.max_lines)
@@ -63,56 +68,72 @@ class FileUtils:
             return f"Error reading file {file_path}: {e}"
 
     def _is_safe_file(self, file_path):
-        """Return True if the file has a whitelisted extension or is identified as text using python-magic."""
         if any(file_path.lower().endswith(ext) for ext in self.safe_extensions):
-            return True  # Extension is whitelisted
-
-        # For files not in the whitelist (or without an extension), use python-magic
+            return True
         return self._is_text_file(file_path)
 
     def _is_text_file(self, file_path):
-        """Determine if a file is text-based using python-magic."""
         try:
             mime = magic.Magic(mime=True)
             return mime.from_file(file_path).startswith("text")
         except Exception:
             return False
 
+    def _is_image(self, file_path):
+        try:
+            mime = magic.Magic(mime=True)
+            return mime.from_file(file_path).startswith("image")
+        except Exception:
+            return False
+
+    async def _process_image(self, file_path):
+        loop = asyncio.get_running_loop()
+        try:
+            def resize_and_encode():
+                with Image.open(file_path) as img:
+                    img.thumbnail((1120, 1120))
+                    buffer = BytesIO()
+                    img.save(buffer, format="PNG")
+                    return base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+            encoded_image = await loop.run_in_executor(None, resize_and_encode)
+            description =  await self.image_processor._describe_image(encoded_image)
+            
+            return f"Description of the {file_path} ny the vision model: {description}"
+        except Exception as e:
+            return f"Error processing image {file_path}: {e}"
 
     async def _read_last_n_lines(self, file_path, num_lines):
-            """Reads the last N lines of a file asynchronously using a buffered approach."""
-            buffer = []
-            loop = asyncio.get_running_loop()
+        buffer = []
+        loop = asyncio.get_running_loop()
 
-            async with aiofiles.open(file_path, 'r', encoding="utf-8", errors="ignore") as file:
-                # Get file size using synchronous function in thread pool
-                file_size = await loop.run_in_executor(None, lambda: self._get_file_size(file_path))
-                pos = file_size
-                data = ""
+        async with aiofiles.open(file_path, 'r', encoding="utf-8", errors="ignore") as file:
+            file_size = await loop.run_in_executor(None, lambda: self._get_file_size(file_path))
+            pos = file_size
+            data = ""
 
-                while pos > 0 and len(buffer) < num_lines:
-                    pos = max(0, pos - self.chunk_size)
-                    await file.seek(pos)  # Seek is now async
-                    chunk = await file.read(self.chunk_size)
-                    data = chunk + data  # Prepend new chunk
-                    lines = data.splitlines()
+            while pos > 0 and len(buffer) < num_lines:
+                pos = max(0, pos - self.chunk_size)
+                await file.seek(pos)
+                chunk = await file.read(self.chunk_size)
+                data = chunk + data
+                lines = data.splitlines()
 
-                    if len(lines) > num_lines:
-                        buffer = lines[-num_lines:]
-                        break
-                    else:
-                        buffer = lines
+                if len(lines) > num_lines:
+                    buffer = lines[-num_lines:]
+                    break
+                else:
+                    buffer = lines
 
-                return "\n".join(buffer) if buffer else "[File is empty]"
+            return "\n".join(buffer) if buffer else "[File is empty]"
 
     def _get_file_size(self, file_path):
-            """Gets file size synchronously for compatibility with aiofiles."""
-            try:
-                with open(file_path, "rb") as f:
-                    f.seek(0, 2)  # Move to end of file
-                    return f.tell()
-            except Exception:
-                return 0
+        try:
+            with open(file_path, "rb") as f:
+                f.seek(0, 2)
+                return f.tell()
+        except Exception:
+            return 0
 
 
     def generate_structure(self, folder_path, root_folder, prefix=""):
@@ -158,13 +179,14 @@ class FileUtils:
                         file_contents += f"\nSkipping file (unsupported): {file_path}"
                     else:
                         content = await self.read_file(file_path, root_folder)
-                        file_contents += f"\n{content.strip()}\n"
+                        if file_contents:
+                            file_contents += f"\n{content.strip()}\n"
             return structure + file_contents
 
         except PermissionError:
             return f"Error: Permission denied to access '{folder_path}'."
 
-    async def search_files(self, missing_path, search_dir=None, max_results=10):
+    async def search_files(self, missing_path, search_dir=None, max_results=100):
         """
         Searches for a missing file or folder in the specified directory.
         Defaults to the home directory if none is provided.
