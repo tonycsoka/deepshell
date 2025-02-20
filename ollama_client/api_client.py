@@ -10,14 +10,20 @@ class OllamaClient:
         self.config = config
         self.mode = mode
         self.stream = stream
-        self.render_output = render_output
-        self.show_thinking = show_thinking
+
+        self.pause_stream = False
         self.output_buffer = asyncio.Queue()
+        self.render_output = render_output
+
+        self.show_thinking = show_thinking
+        self.thoughts = []
+
+        self.last_response = ""
+
         self.keep_history = True
         self.history = []
-        self.last_response = ""
-        self.pause_stream = False
-
+       
+              
     def switch_mode(self, mode):
         """Dynamically switches mode and updates config."""
         if mode == self.mode:
@@ -56,7 +62,7 @@ class OllamaClient:
             return "No image provided"
 
         if self.mode == Mode.VISION:
-            message = {'role': 'user', 'content': 'Describe this image', 'images': [image]}
+            message = {'role': 'user', 'content': 'Briefly describe this image', 'images': [image]}
             response = await AsyncClient().chat(model=self.model, messages=[message])
             
             message_data = response.get('message')

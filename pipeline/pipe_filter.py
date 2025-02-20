@@ -76,7 +76,7 @@ class PipeFilter:
         if self.ollama_client.keep_history:
             self.ollama_client.history.append({"role": "assistant", "content":results})
         self.ollama_client.last_response = results
-        self.ollama_client.last_thoughts = thoughts
+        self.ollama_client.thoughts.append(thoughts)
 
    
     async def extract_code(self, response):
