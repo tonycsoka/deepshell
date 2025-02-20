@@ -1,6 +1,6 @@
 import asyncio
 from utils.command_processor import CommandProcessor
-from config.system_prompts import shell_helper, analyzer_helper
+from chatbot.helper import PromptHelper
 from config.settings import Mode
 from ui.ui import ChatMode
 from chatbot.deployer import ChatBotDeployer
@@ -70,7 +70,7 @@ class ChatManager:
         Handles tasks when the client is in SHELL mode.
         """
         if not bypass:
-            input = await self._handle_code_mode(shell_helper(input), no_render=True)
+            input = await self._handle_code_mode(PromptHelper.shell_helper(input), no_render=True)
             input, output = await self.executor.start(input)
         else:
             output = await self.executor.execute_command(input)
@@ -79,7 +79,7 @@ class ChatManager:
             if self.ui and await self.ui.yes_no_prompt("Do you want to see the output?", default="No"):
                 await self.ui.buffer.put(output)
 
-            output = analyzer_helper(input, output)
+            output = PromptHelper.analyzer_helper(input, output)
             if self.client.mode != Mode.DEFAULT:
                 await self._handle_default_mode(output, client=self.listener, filtering=self.listener_filter)
             else:
