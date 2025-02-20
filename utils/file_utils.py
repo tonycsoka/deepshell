@@ -27,6 +27,7 @@ class FileUtils:
 
     async def process_file_or_folder(self, target):
         target = target.strip()
+        results = None
        
         if not os.path.exists(target):
             choice = await self.prompt_search(target)
@@ -36,22 +37,24 @@ class FileUtils:
             target = choice
 
         if os.path.isfile(target):
-            return await self.read_file(target)
+            results =  await self.read_file(target)
         elif os.path.isdir(target):
-            return await self.read_folder(target)
+            results =  await self.read_folder(target)
 
-        return None
+        
+        return results
 
-    async def read_file(self, file_path, root_folder=None):
+    async def read_file(self, file_path, root_folder=None,just_content = False):
         try:
-            if self.image_processor:
-                if self._is_image(file_path):
-
-                    await self._print_message(f"[green]\nProcessing the image: {file_path}[/green]")
-                    return await self._process_image(file_path)
+            
 
             if not self._is_safe_file(file_path):
                 return f"Skipping file (unsupported): {file_path}"
+
+            if PROCESS_IMAGES:
+                if self._is_image(file_path):
+                    await self._print_message(f"[green]\nProcessing the image: {file_path}[/green]")
+                    return await self._process_image(file_path)
 
             await self._print_message(f"[green]\nReading {file_path}[/green]")
             
@@ -61,9 +64,11 @@ class FileUtils:
             else:
                 async with aiofiles.open(file_path, 'r', encoding="utf-8", errors="ignore") as file:
                     content = await file.read()
-
-            return f"--------- {relative_path} ---------\n" + content
-
+            if just_content:
+                return content
+            else:
+                return f"Content of {relative_path}: {content}"
+    
         except Exception as e:
             return f"Error reading file {file_path}: {e}"
 
@@ -99,7 +104,7 @@ class FileUtils:
             encoded_image = await loop.run_in_executor(None, resize_and_encode)
             description =  await self.image_processor._describe_image(encoded_image)
             
-            return f"Description of the {file_path} ny the vision model: {description}"
+            return f"Image description by the vision model: {description}"
         except Exception as e:
             return f"Error processing image {file_path}: {e}"
 
@@ -157,6 +162,7 @@ class FileUtils:
 
         return structure
 
+   
     async def read_folder(self, folder_path, root_folder=None):
         """Recursively scans and reads all files in a folder.
            The folder structure is generated for all files; however, only files with safe extensions
@@ -169,22 +175,25 @@ class FileUtils:
         try:
             structure = self.generate_structure(folder_path, root_folder)
             file_contents = "\n### File Contents ###\n"
-            
+
+            # Collecting content of all files
             for root, _, files in os.walk(folder_path):
                 if any(ignored in root.split(os.sep) for ignored in self.ignore_folders):
                     continue
                 for file in files:
                     file_path = os.path.join(root, file)
                     if not any(file.lower().endswith(ext) for ext in self.safe_extensions):
-                        file_contents += f"\nSkipping file (unsupported): {file_path}"
+                        file_contents += f"\nSkipping file (unsupported): {file_path}\n"
                     else:
-                        content = await self.read_file(file_path, root_folder)
-                        if file_contents:
-                            file_contents += f"\n{content.strip()}\n"
+                        content = await self.read_file(file_path, root_folder, True)
+                        # Append content with clear separation
+                        file_contents += f"\n\n### File: {file_path} ###\n{content.strip()}"
+
             return structure + file_contents
 
         except PermissionError:
             return f"Error: Permission denied to access '{folder_path}'."
+
 
     async def search_files(self, missing_path, search_dir=None, max_results=100):
         """
