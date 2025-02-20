@@ -45,9 +45,7 @@ class FileUtils:
         return results
 
     async def read_file(self, file_path, root_folder=None,just_content = False):
-        try:
-            
-
+        try: 
             if not self._is_safe_file(file_path):
                 return f"Skipping file (unsupported): {file_path}"
 
@@ -195,7 +193,7 @@ class FileUtils:
             return f"Error: Permission denied to access '{folder_path}'."
 
 
-    async def search_files(self, missing_path, search_dir=None, max_results=100):
+    async def search_files(self, missing_path, search_dir=None):
         """
         Searches for a missing file or folder in the specified directory.
         Defaults to the home directory if none is provided.
@@ -211,10 +209,9 @@ class FileUtils:
             for name in files + dirs:
                 if missing_path.lower() in name.lower():
                     results.append(os.path.join(root, name))
-                    if len(results) >= max_results:
-                        return results
         return results
 
+  
     async def prompt_search(self, missing_path):
         """
         Prompts the user to search for a file when the target is missing.
@@ -237,7 +234,7 @@ class FileUtils:
                     print(f"No matches found for '{missing_path}'.")
                     retry = input("Would you like to try again? (yes/no): ").strip().lower()
                 if retry == "no":
-                    return None
+                    return "cancel"
                 if hasattr(self, "ui") and self.ui is not None:
                     missing_path = await self.ui.get_user_input("Modify search term:")
                 else:
@@ -260,7 +257,7 @@ class FileUtils:
                     print(f"{i}. {res}")
                 choice_str = input("Enter the number of your choice (or 'cancel'): ").strip()
                 if choice_str.lower() == "cancel":
-                    return None
+                    return "cancel"
                 if choice_str.isdigit() and 1 <= int(choice_str) <= len(results):
                     choice = results[int(choice_str)-1]
                 else:
@@ -268,8 +265,9 @@ class FileUtils:
                     continue
 
             if choice == "cancel":
-                return None
+                return "cancel"
             return choice
+
 
     async def _print_message(self, message: str):
         """Print messages either through UI or terminal."""

@@ -63,9 +63,14 @@ class CommandProcessor:
         target = target.strip()
         if not os.path.exists(target):
             choice = await self.file_utils.prompt_search(target)
-            if not choice and self.ui:
-                await self.ui.fancy_print("\n[yellow]Nothing found[/yellow]")
+            if not choice:
+                if self.ui:
+                    await self.ui.fancy_print("\n[cyan]System:[/cyan] Nothing found\n")
                 return None, None
+            if choice == "cancel":
+                if self.ui:
+                    await self.ui.fancy_print("\n[cyan]System:[/cyan] search canceled by user\n")
+                return choice
             target = choice
 
         # Ensure default additional action if none is specified
