@@ -22,14 +22,6 @@ class CommandProcessor:
         if user_input:
             target, additional_action = await self.detect_action(user_input)
             if target:
-                # Ensure "open this folder" works without an additional action
-                if target == os.getcwd():
-                    file_content = await self.file_utils.process_file_or_folder(target)
-                    if file_content == -1:
-                        user_input = None
-                        return None
-                    return file_content or f"Opened folder: {target}"  # Ensure output is returned
-
                 file_content = await self.file_utils.process_file_or_folder(target)
                 if file_content:
                     return self.format_input(user_input, file_content, additional_action)
@@ -60,6 +52,8 @@ class CommandProcessor:
         # Ensure "this folder" is properly converted
         if target.lower() == "this folder":
             target = os.getcwd()
+        if target and not additional_action:
+            additional_action = "Analyze this content"
 
         return target, additional_action
 
