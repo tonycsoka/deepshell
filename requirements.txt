@@ -1,0 +1,6 @@
+ollama
+textual
+aiofiles
+python-magic
+numpy
+sklearn
