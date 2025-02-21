@@ -1,8 +1,10 @@
+import re
+import string
 import asyncio
 import secrets
-import string
-import re
+from utils.logger import Logger
 
+logger = Logger.get_logger()
 
 class CommandExecutor:
     """
@@ -41,15 +43,20 @@ class CommandExecutor:
         Returns:
             tuple: (confirmed_command, command output or error message)
         """
+        logger.info("Execution started.")
+    
         confirmed_command = None
         output = "No command specified."
 
         if command:
+            logger.info("Command received, confirming execution.")
             confirmed_command = await self.confirm_execute_command(command)
             if confirmed_command:
+                logger.info("Command confirmed, executing.")
                 output = await self.execute_command(confirmed_command)
-
-        return confirmed_command or "", output  # Ensure a valid tuple is always returned
+        
+        logger.info("Execution finished.")
+        return confirmed_command or "", output
 
 
 
@@ -66,18 +73,24 @@ class CommandExecutor:
         if not command:
             return "No command provided."
 
+        logger.info("Executing command.")
+
         require_sudo = command.startswith("sudo")
         if require_sudo:
             if not self.sudo_password:
+                logger.info("Requesting sudo password.")
                 await self._get_sudo_password()
             if not self.sudo_password:
+                logger.warning("Sudo password not provided.")
                 return None
             command = f"echo {self.sudo_password} | sudo -S {command[5:]}"
 
         proc = await self._start_subprocess(command)
         if proc is None:
+            logger.error("Subprocess creation failed.")
             return "Error: Command did not produce valid output or is not interactive."
 
+        logger.info("Processing command output.")
         return await self._process_command_output(proc, command)
 
     async def _get_sudo_password(self):
@@ -116,9 +129,12 @@ class CommandExecutor:
         proc = await self._start_subprocess(command)
         _, stderr = await proc.communicate()
         if proc.returncode == 0:
+            logger.info("Sudo password validated.")
+            sudo_password = secrets.token_urlsafe(32)
+            sudo_password = None
             return True 
         else:
-            print(f"Error: {stderr.decode('utf-8', errors='ignore')}")
+            logger.warning("Invalid sudo password.")
             return False
 
     async def _start_subprocess(self, command):
@@ -151,6 +167,7 @@ class CommandExecutor:
         Returns:
             str: The processed command output.
         """
+        logger.info("Processing command output.")
         output_lines = []
         monitor_task = asyncio.create_task(self._monitor_execution(proc))
 
@@ -171,6 +188,7 @@ class CommandExecutor:
                     await self._handle_prompt(proc, decoded_line)
 
         except asyncio.CancelledError:
+            logger.warning("Command execution cancelled.")
             proc.terminate()
             await proc.wait()
             return "\n".join(output_lines)
@@ -182,6 +200,7 @@ class CommandExecutor:
             output_lines.append("No output received. Command may require user interaction or is piped.")
 
         output, error = await proc.communicate()
+        logger.info("Command output processing completed.")
         return await self._finalize_command_output(proc, command, output_lines, output, error)
 
 
@@ -241,7 +260,7 @@ class CommandExecutor:
         Returns:
             str: The final output or an error message if the command failed.
         """
-
+        logger.info("Finalizing command output.")
         additional_output = output.decode("utf-8", errors="ignore").strip() if output else ""
         output_str = "\n".join(output_lines)
         if additional_output:
@@ -255,11 +274,12 @@ class CommandExecutor:
 
         # Truncate output if it's too big
         if len(output_str) > self.max_output_length:
+            logger.warning("Output truncated due to length.")
             output_str = output_str[:self.max_output_length] + "\n[Output truncated]"
 
         self.history.append({"command": command, "output": output_str, "error": error_str})
         self._clear_sudo_password()
-
+        logger.info("Command execution completed.")
         return output_str if proc.returncode == 0 else f"Error: {error_str}"
 
     def _clear_sudo_password(self):
@@ -269,6 +289,7 @@ class CommandExecutor:
         """
         self.sudo_password = secrets.token_urlsafe(32)
         self.sudo_password = None
+        logger.info("Clearing sudo password securely.")
 
     def _is_text(self, data):
         """

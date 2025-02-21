@@ -1,11 +1,11 @@
 import sys
 import asyncio
 import secrets
-from textual.app import App, ComposeResult
-from textual.widgets import Input, RichLog
 from textual import events
-from textual.containers import Vertical
 from ui.rendering import Rendering
+from textual.containers import Vertical
+from textual.widgets import Input, RichLog
+from textual.app import App, ComposeResult
 
 class ChatMode(App):
     _instance = None
@@ -55,10 +55,7 @@ class ChatMode(App):
 
         # Start rendering the output in the background
         asyncio.create_task(self.rendering.render_output())
-        # Initializing client
-        await self.manager.client_init()
-        # Print the system message once the client is initialized
-        asyncio.create_task(self.fancy_print(self.system_message))
+     
         # Deploy the task with the file and user input if available
         if self.user_input or self.file or self.file_content:
             if self.file_content:
@@ -67,7 +64,9 @@ class ChatMode(App):
                 self.input_widget.disabled = True
             asyncio.create_task(self.manager.deploy_task(self.user_input, self.file,self.file_content))
             self.user_input,self.file,self.file_content = None,None,None
-        
+        # Print the system message once the client is initialized
+        asyncio.create_task(self.fancy_print(self.system_message))
+
     async def on_key(self, event: events.Key) -> None:
         """Handles user input from the keyboard."""
         if event.key =="ctrl+c":

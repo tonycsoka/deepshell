@@ -1,7 +1,7 @@
 import sys
-from ollama_client.api_client import OllamaClient
-from utils.args_utils import parse_args 
 from config.settings import *
+from utils.args_utils import parse_args 
+from ollama_client.api_client import OllamaClient
 
 class ClientDeployer:
     """Deploys an isntance of Ollama API Client"""

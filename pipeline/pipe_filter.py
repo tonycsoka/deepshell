@@ -1,6 +1,9 @@
 import re
 import asyncio
 from config.settings import Mode
+from utils.logger import Logger
+
+logger = Logger.get_logger()
 
 class PipeFilter:
     def __init__(self, ollama_client):
@@ -27,7 +30,8 @@ class PipeFilter:
             self.extracted_code = await self.extract_code(response=full_input)
 
             if self.extracted_code:
-                await self.buffer.put(self.extracted_code)  
+                await self.buffer.put(self.extracted_code)
+            logger.debug(f"Extracted code: {self.extracted_code}")
             return
 
         # --- Default behavior: Process thoughts and full response ---
@@ -73,11 +77,32 @@ class PipeFilter:
         # Extract thoughts after streaming
         full_text = full_input
         thoughts = re.findall(r"<think>(.*?)</think>", full_text, flags=re.DOTALL)
-        if self.ollama_client.keep_history:
-            self.ollama_client.history.append({"role": "assistant", "content":results})
         self.ollama_client.last_response = results
         self.ollama_client.thoughts.append(thoughts)
+        logger.debug(f"PipeFilter output: {results} Thoughts: {thoughts}")
 
+    async def process_static(self, text: str, extract_code=False):
+        """Processes a static string, handling thoughts and code differently based on config."""
+        if extract_code:
+            self.ollama_client.last_response = text
+            self.extracted_code = await self.extract_code(response=text)
+
+            if self.extracted_code:
+                await self.buffer.put(self.extracted_code)
+            logger.debug(f"Extracted code: {self.extracted_code}")
+            return self.extracted_code
+
+        # Process thoughts and filter them
+        thoughts = re.findall(r"<think>(.*?)</think>", text, flags=re.DOTALL)
+        filtered_text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+
+        self.ollama_client.last_response = filtered_text
+        self.ollama_client.thoughts.append(thoughts)
+        
+        await self.buffer.put(filtered_text)
+
+        logger.debug(f"Filtered text: {filtered_text} Thoughts: {thoughts}")
+        return filtered_text
    
     async def extract_code(self, response):
         """Extracts shell or code snippets from the response.

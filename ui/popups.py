@@ -1,9 +1,9 @@
 import asyncio
+from textual import events
+from textual.widget import Widget
 from textual.app import ComposeResult
 from textual.containers import ScrollableContainer
 from textual.widgets import Static, RadioSet, RadioButton
-from textual import events
-from textual.widget import Widget
 
 class RadiolistPopup(Widget):
     """A popup widget that displays a scrollable radio list for selection and returns the chosen value."""

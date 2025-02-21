@@ -1,20 +1,24 @@
 import os
 import re
+from utils.logger import Logger
 from utils.file_utils import FileUtils
 from utils.shell_utils import CommandExecutor
+
+logger = Logger.get_logger()
 
 class CommandProcessor:
     """Handles user input"""
     
-    def __init__(self, ui=None):
-        self.ui = ui
-        self.file_utils = FileUtils(ui)
-        self.executor = CommandExecutor(ui)
+    def __init__(self, manager):
+        self.manager = manager
+        self.ui = manager.ui
+        self.file_utils = FileUtils(manager)
+        self.executor = CommandExecutor(self.ui)
     
     async def handle_command(self, user_input):
         """Processes commands, handles file/folder operations, and updates config."""
         bypass_flag = False
-        
+
         if user_input.startswith("!"):
             user_input = user_input[1:] 
             bypass_flag = True
@@ -23,12 +27,11 @@ class CommandProcessor:
         if user_input:
             target, additional_action = await self.detect_action(user_input)
             if target:
-                file_content = await self.file_utils.process_file_or_folder(target)
-                if file_content:
-                    if self.ui:
-                        await self.ui.fancy_print("\n[cyan]System:[/cyan] File processing complete. \nSubmiting the input to the chatbot")
-
-                    return self.format_input(user_input, file_content, additional_action)
+                await self.file_utils.process_file_or_folder(target)
+                if additional_action:
+                    user_input = additional_action
+                   
+                return user_input
             else:
                 if additional_action == "cancel":
                     return None
@@ -74,8 +77,11 @@ class CommandProcessor:
             target = choice
 
         # Ensure default additional action if none is specified
-        if target and not additional_action:
-            additional_action = "Analyze this content"
+        if target:
+            if not additional_action:
+                additional_action = f"Analyze the content of {target}"
+            else:
+                additional_action = f"{additional_action} for {target}"
         
         return target, additional_action
 
