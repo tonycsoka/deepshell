@@ -3,4 +3,4 @@ textual
 aiofiles
 python-magic
 numpy
-sklearn
+scikit-learn
