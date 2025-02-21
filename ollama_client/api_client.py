@@ -36,15 +36,17 @@ class OllamaClient:
         self.mode = mode
         self.history.clear()
 
-    async def _chat_stream(self, input):
+    async def _chat_stream(self, input= None, history = None):
         """Fetches response from the Ollama API and streams into output buffer."""
-
-        input = {"role": "user", "content": input}
-        if self.keep_history:
-            self.history.append(input)
-            input = self.history
+        if history:
+            input = history
         else:
-            input = [input]
+            input = {"role": "user", "content": input}
+            if self.keep_history:
+                self.history.append(input)
+                input = self.history
+            else:
+                input = [input]
 
         async for part in await self.client.chat(
             model=self.model,
@@ -72,11 +74,11 @@ class OllamaClient:
             content = message_data.get('content')
             return content if isinstance(content, str) else "No content found"
 
-    async def _fetch_response(self, user_input=None, history = None):
+    async def _fetch_response(self, input=None, history = None):
         if history:
             message = history
         else:
-            message = [{'role': 'user', 'content': user_input}]
+            message = [{'role': 'user', 'content': input}]
         response = await AsyncClient().chat(model=self.model, messages=message)
             
         message_data = response.get('message')
