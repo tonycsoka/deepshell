@@ -62,8 +62,8 @@ class OllamaClient:
             return "No image provided"
 
         if self.mode == Mode.VISION:
-            message = {'role': 'user', 'content': 'Briefly describe this image', 'images': [image]}
-            response = await AsyncClient().chat(model=self.model, messages=[message])
+            message = [{'role': 'user', 'content': 'Briefly describe this image', 'images': [image]}]
+            response = await AsyncClient().chat(model=self.model, messages=message)
             
             message_data = response.get('message')
             if not message_data:
@@ -72,10 +72,12 @@ class OllamaClient:
             content = message_data.get('content')
             return content if isinstance(content, str) else "No content found"
 
-    async def _fetch_response(self, message):
-       
-        message = {'role': 'user', 'content': message}
-        response = await AsyncClient().chat(model=self.model, messages=[message])
+    async def _fetch_response(self, user_input=None, history = None):
+        if history:
+            message = history
+        else:
+            message = [{'role': 'user', 'content': user_input}]
+        response = await AsyncClient().chat(model=self.model, messages=message)
             
         message_data = response.get('message')
         if not message_data:
