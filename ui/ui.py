@@ -31,7 +31,7 @@ class ChatMode(App):
             self.transfer_buffer = self.rendering.transfer_buffer
             self.user_input, self.file, self.file_content = user_input,file,file_content
             self.system_message = (
-            f"[green]Chat with: [cyan]{self.client.model}[/cyan] in [cyan]{self.client.mode.name}[/cyan] mode."
+            f"\n\n[green]Chat with: [cyan]{self.client.model}[/cyan] in [cyan]{self.client.mode.name}[/cyan] mode."
             "\nType [red]exit[/red] or press [blue]Ctrl+C[/blue] to quit.[/green]\n"
 
         )

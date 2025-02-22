@@ -1,5 +1,8 @@
 import re
 import asyncio
+from utils.logger import Logger
+
+logger = Logger.get_logger()
 
 class Rendering:
     def __init__(self, chat_app):
@@ -23,17 +26,15 @@ class Rendering:
         await asyncio.sleep(0.01)
 
 
-    async def fancy_print(self, content, delay=0.03):
+    async def fancy_print(self, content, delay=0.01):
         """Render string word by word, preserving newlines and other whitespace."""
-        # Split content into chunks, keeping spaces and newlines
-        chunks = re.split(r'(\s+)', content)  # Split by any whitespace (spaces, tabs, newlines)
+        while not self.chat_app.buffer.empty():
+            await asyncio.sleep(0.01) 
+        chunks = re.split(r'(\s+)', content)
         
         for chunk in chunks:
-            # Check if chunk is empty or whitespace and handle accordingly
             if chunk == '\n':  # Handle newline separately to ensure correct formatting
                 await self.chat_app.buffer.put('\n')  # Send newline directly to the buffer
-            elif chunk.isspace():  # Handle spaces and tabs
-                await self.chat_app.buffer.put(chunk)  # Send space or tab directly to the buffer
             else:
                 await self.chat_app.buffer.put(chunk)  # Send words to buffer
             await asyncio.sleep(delay) 
@@ -44,6 +45,10 @@ class Rendering:
         Continuously transfer data from the source_buffer (e.g. filtering's buffer)
         into the UI's rendering buffer, but only if the transfer is enabled.
         """
+
+        while not self.chat_app.buffer.empty():
+            await asyncio.sleep(0.01)
+
         if isinstance(content, asyncio.Queue):
             while True:
                 chunk = await content.get()
