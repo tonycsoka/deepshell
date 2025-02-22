@@ -56,6 +56,7 @@ class CommandExecutor:
                 output = await self.execute_command(confirmed_command)
         
         logger.info("Execution finished.")
+        logger.debug(f"Command: {confirmed_command} Output: {output}")
         return confirmed_command or "", output
 
 

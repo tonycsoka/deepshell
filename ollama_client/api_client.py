@@ -87,7 +87,7 @@ class OllamaClient:
             
             try:
                 response = await AsyncClient().chat(model=self.model, messages=message)
-                logger.info(f"Image description response: {response}")
+                logger.debug(f"Image description response: {response}")
                 
                 message_data = response.get('message')
                 if not message_data:
@@ -114,6 +114,7 @@ class OllamaClient:
         try:
             response = await AsyncClient().chat(model=self.model, messages=message)
             logger.info("Response received successfully")
+            logger.debug(f"Response: {response}")
 
             message_data = response.get('message')
             if not message_data:

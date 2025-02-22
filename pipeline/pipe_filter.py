@@ -79,7 +79,7 @@ class PipeFilter:
         thoughts = re.findall(r"<think>(.*?)</think>", full_text, flags=re.DOTALL)
         self.ollama_client.last_response = results
         self.ollama_client.thoughts.append(thoughts)
-        logger.debug(f"PipeFilter output: {results} Thoughts: {thoughts}")
+        logger.debug(f"PipeFilter output: {results} \n Thoughts: {thoughts}")
 
     async def process_static(self, text: str, extract_code=False):
         """Processes a static string, handling thoughts and code differently based on config."""
@@ -101,7 +101,7 @@ class PipeFilter:
         
         await self.buffer.put(filtered_text)
 
-        logger.debug(f"Filtered text: {filtered_text} Thoughts: {thoughts}")
+        logger.debug(f"Filtered text: {filtered_text} \nThoughts: {thoughts}")
         return filtered_text
    
     async def extract_code(self, response):
