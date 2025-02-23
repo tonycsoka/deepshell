@@ -88,7 +88,9 @@ class ChatMode(App):
                     await self.fancy_print(f"\n\n[bold red]You: [/bold red][white]{text}[/white]")
                     self.input_widget.clear()
                     self.input_widget.focus()
-                    asyncio.create_task(self.manager.deploy_task(text))
+                    self.input_widget.disabled = True
+                    await self.manager.deploy_task(text)
+                    self.input_widget.disabled = False 
 
     def exit_app(self):
         if self.pswd:
