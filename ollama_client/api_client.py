@@ -46,7 +46,7 @@ class OllamaClient:
 
     async def _chat_stream(self, input=None, history=None):
         """Fetches response from the Ollama API and streams into output buffer."""
-        logger.info("Starting chat stream")
+        logger.info(f"{self.mode.name} started stream")
         
         if history:
             input = history
@@ -102,7 +102,7 @@ class OllamaClient:
 
     async def _fetch_response(self, input=None, history=None):
         """Fetches a complete response from the model."""
-        logger.info("Fetching response")
+        logger.info(f"{self.mode.name} is fetching response")
 
         if history:
             message = history
