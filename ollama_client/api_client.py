@@ -63,8 +63,7 @@ class OllamaClient:
                 stream=self.stream
             ):
                 if not self.pause_stream:
-                    content = part.get('message', {}).get('content', '')
-                    logger.debug(f"Streaming chunk: {content[:50]}...")  # Logging first 50 chars
+                    content = part.get('message', {}).get('content', '') 
                     await self.output_buffer.put(content)
             
             if not self.pause_stream:
@@ -109,13 +108,9 @@ class OllamaClient:
         else:
             message = [{'role': 'user', 'content': input}]
         
-        logger.debug(f"Fetch request payload: {message}")
-
         try:
             response = await AsyncClient().chat(model=self.model, messages=message)
             logger.info("Response received successfully")
-            logger.debug(f"Response: {response}")
-
             message_data = response.get('message')
             if not message_data:
                 logger.warning("No message found in response")
