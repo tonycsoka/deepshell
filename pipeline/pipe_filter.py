@@ -80,6 +80,7 @@ class PipeFilter:
         self.ollama_client.last_response = results
         self.ollama_client.thoughts.append(thoughts)
         logger.debug(f"PipeFilter output: {results} \n Thoughts: {thoughts}")
+        await self.buffer.put(None)
 
     async def process_static(self, text: str, extract_code=False):
         """Processes a static string, handling thoughts and code differently based on config."""
@@ -100,6 +101,7 @@ class PipeFilter:
         self.ollama_client.thoughts.append(thoughts)
         
         await self.buffer.put(filtered_text)
+        await self.buffer.put(None)
 
         logger.debug(f"Filtered text: {filtered_text} \nThoughts: {thoughts}")
         return filtered_text

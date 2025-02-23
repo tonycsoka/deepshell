@@ -85,12 +85,12 @@ class ChatMode(App):
                 if text.lower() == "exit":
                     self.exit_app()
                 else:
+                  
                     await self.fancy_print(f"\n\n[bold red]You: [/bold red][white]{text}[/white]")
                     self.input_widget.clear()
                     self.input_widget.focus()
-                    self.input_widget.disabled = True
-                    await self.manager.deploy_task(text)
-                    self.input_widget.disabled = False 
+                    asyncio.create_task(self.manager.deploy_task(text))
+        
 
     def exit_app(self):
         if self.pswd:
@@ -100,6 +100,7 @@ class ChatMode(App):
 
     def wait_for_input(self):
         """Helper method to wait for input asynchronously."""
+        self.input_widget.focus()
         self.input_future = asyncio.Future()
         return self.input_future
 
@@ -108,7 +109,8 @@ class ChatMode(App):
         If is_password is True, masks the input like a password.
         """
         await self.fancy_print(f"\n[cyan]System:[/cyan] {prompt_text}")
-        
+    
+              
         self.input_widget.value = input_text  # Set initial text
         self.input_widget.placeholder = prompt_text
 
@@ -117,20 +119,20 @@ class ChatMode(App):
             self.input_widget.placeholder = "●●●●●●●●"
         else:
             self.input_widget.password = False
-
+    
         result = await self.wait_for_input()
         user_input = result.strip() if result else ""
+        
         
         if is_password:
             self.input_widget.password = False
             self.input_widget.placeholder = "Type here and press Enter:..."
-        
+
         return user_input
 
    
     async def yes_no_prompt(self, prompt_text, default="yes"):
         """Prompts the user with yes or no with an optional default."""
-        
         valid_defaults = {"yes": True, "y": True, "no": False, "n": False}
 
         if default.strip().lower() == "yes":
