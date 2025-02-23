@@ -16,11 +16,8 @@ class ChatManager:
     """
 
     def __init__(self):
-        self.deployer = ChatBotDeployer() 
-        self.client, self.filtering = self.deployer.deploy_chatbot() 
-
+        self.client, self.filtering = ChatBotDeployer.deploy_chatbot() 
         self.ui = ChatMode(self) if self.client.render_output else None
-        self.deployer.ui = self.ui or None
 
         self.history_manager = HistoryManager()
         self.history = self.history_manager.history
@@ -58,22 +55,19 @@ class ChatManager:
             logger.info("No file content, processing user input.")
             user_input = await self.command_processor.handle_command(user_input)
 
-        
         user_input, bypass_flag = (user_input if isinstance(user_input, tuple) else (user_input, False))
-        
-        if self.client.keep_history:
-            await self.add_to_history("user", user_input)
-            logger.info("User input added to history.")
-            user_input = await self.generate_prompt(user_input)
-        
+          
+        input = await self.generate_prompt(user_input)
         logger.info("Executing task manager.")
-        response = await self.task_manager(user_input, bypass_flag)
+
+        response = await self.task_manager(input, bypass_flag)
         
-        if self.client.keep_history:
-            await self.add_to_history("assistant", response)
-            logger.info("Assistant response added to history.")
+        if self.client.keep_history and self.client.mode != Mode.SHELL:
+            self.add_to_history("user", user_input)
+            self.add_to_history("assistant", response)
         
         logger.info("Deploy task completed.")
+
         return response
 
     async def task_manager(self, user_input, bypass=False):
@@ -82,8 +76,6 @@ class ChatManager:
         """
         logger.info("Task manager started in mode: %s", self.client.mode)
 
-        
-        
         mode_handlers = {
             Mode.SHELL: lambda input: self._handle_shell_mode(input, bypass),
             Mode.CODE: self._handle_code_mode,
@@ -91,7 +83,7 @@ class ChatManager:
         
         if bypass:
             logger.info("Bypassing mode, executing shell mode.")
-            return await self._handle_shell_mode(user_input, bypass)
+            await self._handle_shell_mode(user_input, bypass)
         
         if self.client.mode in mode_handlers:
             logger.info("Handling task in mode: %s", self.client.mode)
@@ -127,6 +119,7 @@ class ChatManager:
         
         self.client.last_response = ""
         self.filtering.extracted_code = ""
+
         logger.info("Shell mode execution completed.")
 
     async def _handle_code_mode(self, input, no_render=False):
@@ -145,7 +138,9 @@ class ChatManager:
             await self.ui.fancy_print(code)
         
         self.tasks = []
+        
         logger.info("Code mode execution completed.")
+
         return code
 
     async def _handle_default_mode(self, input, no_render=False, client=None, filtering=None):
@@ -163,12 +158,16 @@ class ChatManager:
         self.tasks = [get_stream, process_text]
         
         if self.ui and not no_render:
-            rendering_task = asyncio.create_task(self.ui.transfer_buffer(filtering.buffer))
-            self.tasks.append(rendering_task)
-        
-        await asyncio.gather(*self.tasks)
+            asyncio.create_task(self.ui.transfer_buffer(filtering.buffer))
+       
+        try:
+            await asyncio.gather(*self.tasks, return_exceptions=True)
+        except Exception as e:
+            logger.error(f"Error in default mode execution: {e}")
+
         self.tasks = []
-        
+
         logger.info("Default mode execution completed.")
+
         return client.last_response
 

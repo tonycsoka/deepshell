@@ -8,18 +8,18 @@ class ChatBotDeployer:
     """
     Deploys a ready-to-use chatbot with its own pipeline filter.
     """
-    def __init__(self, ui=None):
+    def __init__(self):
         self.client_deployer = ClientDeployer()
-        self.ui = ui
 
-    def deploy_chatbot(self, mode=None):
+    @staticmethod
+    def deploy_chatbot(mode=None):
         """
         Deploys a chatbot with an optional mode.
         """
-        chatbot = self.client_deployer.deploy()
+        client_deployer = ClientDeployer()  # Creating an instance inside the static method
+        chatbot = client_deployer.deploy()
         if mode:
             chatbot.switch_mode(mode)
         logger.info(f"Chatbot deployed in {chatbot.mode.name}")
         return chatbot, PipeFilter(chatbot)
-
 
