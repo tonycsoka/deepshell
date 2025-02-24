@@ -20,7 +20,6 @@ class ChatManager:
         self.ui = ChatMode(self) if self.client.render_output else None
 
         self.history_manager = HistoryManager()
-        self.history = self.history_manager.history
         self.add_to_history = self.history_manager.add_message 
         self.generate_prompt = self.history_manager.generate_prompt
         self.add_file = self.history_manager.add_file
@@ -63,8 +62,8 @@ class ChatManager:
         response = await self.task_manager(input, bypass_flag)
         
         if self.client.keep_history and self.client.mode != Mode.SHELL:
-            self.add_to_history("user", user_input)
-            self.add_to_history("assistant", response)
+            await self.add_to_history("user", user_input)
+            await self.add_to_history("assistant", response)
         
         logger.info("Deploy task completed.")
 

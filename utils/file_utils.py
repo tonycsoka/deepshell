@@ -56,6 +56,7 @@ class FileUtils:
         try: 
             if not self._is_safe_file(file_path):
                 logger.info(f"Skipping file (unsupported): {file_path}")
+                return        
 
             if PROCESS_IMAGES:
                 if self._is_image(file_path):
@@ -80,17 +81,40 @@ class FileUtils:
         except Exception as e:
             logger.error(f"Error reading file {file_path}: {e}")
 
+   
     def _is_safe_file(self, file_path):
-        if any(file_path.lower().endswith(ext) for ext in self.safe_extensions):
-            return True
-        return self._is_text_file(file_path)
+        # Skip empty files immediately
+        if os.path.getsize(file_path) == 0:
+            logger.info(f"Skipping empty file: {file_path}")
+            return False
 
+        # Allow files with known safe extensions
+        if any(file_path.lower().endswith(ext) for ext in self.safe_extensions):
+            return True  
+
+        # Check if the file has NO extension
+        if '.' not in os.path.basename(file_path):
+            logger.info(f"File '{file_path}' has no extension. Checking if it's a text file...")
+            return self._is_text_file(file_path)  
+
+        # If it has an unknown extension, reject it
+        return False
+
+   
     def _is_text_file(self, file_path):
         try:
             mime = magic.Magic(mime=True)
-            return mime.from_file(file_path).startswith("text")
-        except Exception:
-            return False
+            mime_type = mime.from_file(file_path)
+            
+            logger.info(f"Detected MIME type for '{file_path}': {mime_type}")
+            
+            # Ensure it starts with "text/"
+            return mime_type.startswith("text")
+        
+        except Exception as e:
+            logger.error(f"Error detecting MIME type for '{file_path}': {e}")
+            return False  # Assume non-text if an error occurs
+
 
     def _is_image(self, file_path):
         try:
@@ -187,7 +211,7 @@ class FileUtils:
             root_folder = folder_path
 
         try:
-            await self._print_message(f"Generating structure for {folder_path}")
+            await self._print_message(f"\nGenerating structure for {folder_path}")
             structure = self.generate_structure(folder_path,root_folder)
             self.add_folder(structure)
 
