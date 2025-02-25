@@ -38,24 +38,27 @@ class CommandProcessor:
 
         return user_input
 
+   
     async def detect_action(self, user_input):
         """Detects action, validates/finds target, and processes file/folder."""
-    
+
         # Extract action and target
         parts = re.split(r"\band\b", user_input, maxsplit=1)
         main_command = parts[0].strip()
         additional_action = parts[1].strip() if len(parts) > 1 else None
         actions = {"find", "open", "read"}
         tokens = main_command.split()
-        
+
         if not tokens:
             return None, None
 
-        action = next((word for word in tokens if word in actions), None)
+        # Ensure the action is at the beginning of the input
+        action = tokens[0] if tokens[0] in actions else None
         if not action:
             return None, None
 
-        target_index = tokens.index(action) + 1
+        # Extract target (everything after the action)
+        target_index = 1  # Start from the second token, assuming it's the target
         target = " ".join(tokens[target_index:]) if target_index < len(tokens) else ""
 
         # Convert "this folder" to current working directory
@@ -82,7 +85,7 @@ class CommandProcessor:
                 additional_action = f"Analyze the content of {target}"
             else:
                 additional_action = f"{additional_action} for {target}"
-        
+
         return target, additional_action
 
     def format_input(self, user_input, file_content, additional_action=None):
