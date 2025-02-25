@@ -58,7 +58,7 @@ class PromptHelper:
             str: A formatted prompt instructing the model to reply in JSON format.
         """
         # Convert the history data into a human-readable format
-        history_text = "\n".join([f"{entry['role']}: {entry['message']}" for entry in history])
+        history_text = str(history)
         
         logger.debug(f"Topics helper: injected history: {history_text}")
         # Instruction to respond in JSON format
@@ -70,4 +70,17 @@ class PromptHelper:
         The response should be a JSON object with the following keys:
         - "topic_name": The name of the topic.
         - "topic_description": A brief description of the topic.
+        """
+
+
+    @staticmethod
+    def metadata_code(content: str) -> str:
+        return f"""
+        Analyze the following code and generate structured metadata in JSON format. The metadata should include the following categories:
+        1. Functions: List of function names and their descriptions (if any).
+        2. Classes: List of class names and a brief description of their purpose.
+        3. Purpose: A brief summary of what the code is meant to accomplish or its functionality.
+
+        Code:
+        {content}
         """

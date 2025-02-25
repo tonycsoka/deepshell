@@ -196,7 +196,7 @@ class FileUtils:
                 relative_path = os.path.relpath(item_path, root_folder) if root_folder else item_path
                 structure += f"{prefix}-- {relative_path}\n"
         
-        logger.info(f"folder_structure: {structure}")
+        logger.debug(f"folder_structure: {structure}")
         return structure
    
     async def read_folder(self, folder_path, root_folder=None):

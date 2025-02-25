@@ -38,75 +38,51 @@ class Topic:
     def add_message(self, role, message, embedding):
         """Stores raw messages and their embeddings."""
        
-        self.history.append({"role": role, "message": message})
+        self.history.append({"role": role, "content": message})
         self.history_embeddings.append(embedding)
+        #logger.info(f"Embedding shape {embedding.shape}")
         logger.info(f"Message added to {self.name}")
         
-    async def get_relevant_context(self, query: str, top_k: int = 2, similarity_threshold: float = 0.42) -> tuple[float, str, str]:
+    
+   
+    async def get_relevant_context(self, query: str) -> tuple[float, int]:
         """
-        Retrieves relevant context based on the query using cosine similarity, dynamically adjusting threshold.
-        If no relevant messages meet the threshold, returns the last 10 messages from history.
+        Retrieves the best similarity score and the index of the most relevant message
+        from the topic’s history based on cosine similarity.
+
+        Args:
+            query (str): The query text.
+            similarity_threshold (float): The base similarity threshold (not used for slicing here).
 
         Returns:
-            tuple[float, str, str]: A tuple containing:
-                - The similarity score.
-                - The context string.
-                - The topic name.
+            tuple[float, int]: A tuple containing:
+                - The best similarity score.
+                - The index of the best matching message (or -1 if not found).
         """
         logger.debug(f"Fetching relevant context for query(topic): {query}")
 
-        if not self.history and not self.folder_structure:
-            logger.info("No history or folder structure available.")
-            return 0.0, "", self.name
+        if not self.history_embeddings:
+            logger.info("No history embeddings found. Returning empty context.")
+            return 0.0, -1
 
-        context_parts = []
-        similarity_scores = []
-        # If history embeddings are available, find relevant messages
-        if self.history_embeddings:
-            query_embedding = await self.async_fetch_embedding(query)
-            if query_embedding is None or len(query_embedding) == 0:
-                logger.error("Query embedding failed.")
-                return 0.0, "", self.name
-            # Calculate similarities with history embeddings
-            similarities = cosine_similarity([query_embedding], self.history_embeddings)[0]
+        query_embedding = await self.async_fetch_embedding(query)
+        if query_embedding is None or len(query_embedding) == 0:
+            logger.error("Query embedding failed.")
+            return 0.0, -1
 
-            # Calculate dynamic threshold based on query length
-            dynamic_threshold = similarity_threshold * len(query.split()) / 10
+        similarities = cosine_similarity([query_embedding], self.history_embeddings)[0]
+        best_index = int(np.argmax(similarities))
+        best_similarity = float(similarities[best_index])
+        logger.debug(f"Best similarity score: {best_similarity} at index {best_index}")
+        
+        return best_similarity, best_index
 
-            # Get top-k relevant messages above the dynamic threshold
-            relevant_messages = [
-                (f"Role: {self.history[i]['role']} Message: {self.history[i]['message']}", similarities[i])
-                for i in range(len(similarities))
-                if similarities[i] >= dynamic_threshold
-            ][:top_k]
-
-            # If there are relevant messages, append them and their similarities
-            if relevant_messages:
-                for message, score in relevant_messages:
-                    context_parts.append(message)
-                    similarity_scores.append(score)
-
-        # If folder structure is available, add it to context
-        if self.folder_structure:
-            context_parts.append(f"Folder Structure:\n{self.folder_structure}")
-
-        # If no relevant context found, use the last 10 messages from history
-        if not context_parts:
-            logger.info("No relevant context found. Using last 10 messages from history.")
-            last_messages = self.history[-10:]  # Get the last 10 messages
-            return 0.0, "\n".join(f"Role: {msg['role']} Message: {msg['message']}" for msg in last_messages), self.name
-
-        # Calculate average similarity score from relevant messages
-        avg_score = sum(similarity_scores) / len(similarity_scores) if similarity_scores else 0.0
-
-        # Combine the relevant context and return the score
-        return avg_score, "\n".join(context_parts), self.name
 
 
 
 
     
-    async def get_relevant_files(self, query: str, top_k: int = 1, similarity_threshold: float = 0.45) -> list[tuple[str, str]]:
+    async def get_relevant_files(self, query: str, top_k: int = 1, similarity_threshold: float = 0.66) -> list[tuple[str, str]]:
         """
         Retrieves files relevant to the query. First, it attempts to match the query with file paths
         (using a case-insensitive substring match). If any direct matches are found, those files are returned.
@@ -228,7 +204,7 @@ class Topic:
 
 
 class HistoryManager:
-    def __init__(self, top_k: int = 2, similarity_threshold: float = 0.48) -> None:
+    def __init__(self, top_k: int = 2, similarity_threshold: float = 0.6) -> None:
         """
         Initializes HistoryManager to handle topics and off-topic tracking.
         An "unsorted" topic collects messages and files until a clear topic emerges.
@@ -240,7 +216,7 @@ class HistoryManager:
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
         self.topics: list[Topic] = []
-        self.unsorted_topic = Topic()
+        self.current_topic = Topic()
         self.embedding_cache: dict[str, np.ndarray] = {}
 
 
@@ -263,20 +239,28 @@ class HistoryManager:
                 matched_topic.add_message(role, message, message_embedding)
         else:
         
-            logger.info("Message did not match any topic; adding to unsorted topic.")
-            self.unsorted_topic.add_message(role, message,message_embedding)
-        asyncio.create_task(self._evaluate_topics())
+            logger.info("Message did not match any topic; adding to Current topic.")
+            self.current_topic.add_message(role, message,message_embedding)
+        asyncio.create_task(self._analyze_history())
 
-    async def _match_topic(self, embedding: np.ndarray) -> Topic | None:
+    
+    async def _match_topic(self, embedding: np.ndarray, exclude_topic: Topic | None = None) -> Topic | None:
         """
-        Matches a message or file embedding to the most similar topic based on the description embedding.
-        
+        Matches a message or file embedding to the most similar topic based on the description embedding,
+        optionally excluding a specified topic.
+
         Args:
             embedding (np.ndarray): The embedding to match.
-        
+            exclude_topic (Topic | None): A topic to exclude from matching (e.g. the current topic).
+
         Returns:
             Topic | None: The best matching topic if similarity exceeds the threshold.
         """
+        # Early exit if no topics are available.
+        if len(self.topics) == 0:
+            logger.info("No topics available for matching. Returning None.")
+            return None
+
         async def compute_similarity(topic: Topic) -> tuple[float, Topic]:
             if len(topic.embedded_description) == 0 or len(embedding) == 0:
                 return 0.0, topic
@@ -284,7 +268,8 @@ class HistoryManager:
             logger.debug(f"Computed similarity {similarity:.4f} for topic '{topic.name}'")
             return similarity, topic
 
-        tasks = [compute_similarity(topic) for topic in self.topics]
+        # Exclude the specified topic from matching.
+        tasks = [compute_similarity(topic) for topic in self.topics if topic != exclude_topic]
         results = await asyncio.gather(*tasks)
         
         best_topic = None
@@ -293,9 +278,13 @@ class HistoryManager:
             if similarity > best_similarity and similarity >= self.similarity_threshold:
                 best_similarity = similarity
                 best_topic = topic
-    
-        logger.info(f"Best matching topic: '{best_topic.name}' with similarity {best_similarity:.4f}" if best_topic else "No suitable topic found.")
+
+        if best_topic:
+            logger.info(f"Best matching topic: '{best_topic.name}' with similarity {best_similarity:.4f}")
+        else:
+            logger.info("No suitable topic found.")
         return best_topic
+
 
     async def add_file(self, file_path: str, content: str) -> None:
         """
@@ -315,8 +304,17 @@ class HistoryManager:
             matched_topic._add_file(file_path, file_embedding)
         else:
             logger.info(f"File '{file_path}' did not match any topic; adding to unsorted topic.")
-            self.unsorted_topic._add_file(file_path, file_embedding)
-         
+            self.current_topic._add_file(file_path, file_embedding)
+            asyncio.create_task(self.get_file_tags(content))
+
+
+    async def get_file_tags(self,content):
+        response = await helper._fetch_response(PromptHelper.metadata_code(content))
+                      
+        await filter_helper.process_static(response)
+        response = helper.last_response
+        logger.info(f"METADATA {response}")
+
 
     def add_folder_structure(self, structure,topic_name= None) -> None:
         """
@@ -334,55 +332,72 @@ class HistoryManager:
             return
 
         logger.warning(f"Topic '{topic_name}' not found. Applying folder structure to unsorted topic.")
-        self.unsorted_topic.folder_structure = structure
+        self.current_topic.folder_structure = structure
         logger.info("Folder structure updated for unsorted topic.")
 
-   
-    
-    async def get_relevant_context(self, query: str) -> str | None:
+ 
+    async def get_relevant_topic(self, query: str):
         """
-        Asynchronously retrieves context from each topic sequentially and selects
-        the topic with the highest similarity score. Falls back to the unsorted topic
-        if no topic meets the threshold.
-        
+        Asynchronously retrieves the best matching topic based on similarity score.
+        For the best topic meeting the dynamic threshold, it slices the topic's history
+        around the best matching message (from 5 messages before to 5 messages after).
+        If a new (better) topic is found, it updates the current topic—moving the previous
+        one into the topics list if not already present. If no relevant topic is found,
+        it tries to retrieve similar messages within the current topic; failing that, it returns
+        the last 10 messages from the current topic's history.
+
         Args:
             query (str): The user query.
-        
+
         Returns:
-            str | None: The combined context string.
+            list[dict[str, str]]: A slice of the topic's history as the context.
         """
-        if len(self.topics) == 0:
-            logger.info("Returning history as context")
-            return "\n".join([f"{entry['role']}: {entry['message']}" for entry in self.unsorted_topic.history])
-
         best_score = self.similarity_threshold
-        best_context = None
-        best_topic_name = None
+        best_topic = None
+        best_index = -1
 
-        # Iterate over all topics (including unsorted) one by one.
-        for topic in self.topics + [self.unsorted_topic]:
+        if len(self.current_topic.history) < 11:
+            return self.current_topic.history
+
+        # Iterate over all topics including the current topic.
+        for topic in self.topics + [self.current_topic]:
             logger.info(f"Processing topic: {topic.name}")
-            score, context, topic_name = await topic.get_relevant_context(
-                query, self.top_k, self.similarity_threshold
-            )
-            logger.debug(f"Topic '{topic.name}' returned score {score:.4f} with context: {context}")
-            if context and score > best_score:
+            score, index = await topic.get_relevant_context(query)
+            logger.debug(f"Topic '{topic.name}' returned score {score:.4f} at index {index}")
+            
+            # Dynamic threshold adjusts based on query length.
+            dynamic_threshold = self.similarity_threshold * (len(query.split()) / 10)
+            if score >= dynamic_threshold and score > best_score:
                 best_score = score
-                best_context = context
-                best_topic_name = topic_name
+                best_topic = topic
+                best_index = index
 
-        if best_context:
-            logger.info(f"Best matching topic: '{best_topic_name}' with score {best_score:.4f}")
-            return f"Topic: {best_topic_name}\n{best_context}"
+        if best_topic is not None and best_index != -1:
+            logger.info(f"Best matching topic: '{best_topic.name}' with score {best_score:.4f} at index {best_index}")
+            start_index = max(0, best_index - 5)
+            end_index = min(len(best_topic.history), best_index + 6)
+            context_slice = best_topic.history[start_index:end_index]
+            
+            # If the best topic is not the current one, update accordingly.
+            if best_topic.name != self.current_topic.name:
+                # Append the current topic to the topics list if not already present.
+                if not any(t.name == self.current_topic.name for t in self.topics):
+                    self.topics.append(self.current_topic)
+                self.current_topic = best_topic
+            
+            return context_slice
         else:
-            logger.warning("No matching topic found; falling back to unsorted topic.")
-            # Fallback: use unsorted topic's asynchronous context.
-            score, context, topic_name = await self.unsorted_topic.get_relevant_context(
-                query, self.top_k, self.similarity_threshold
-            )
-            return f"Topic: {self.unsorted_topic.name}\n{context}" if context else None
-
-
+            logger.warning("No relevant topic found with high similarity.")
+            # Fallback: attempt to get similar messages within the current topic.
+            fallback_score, fallback_index = await self.current_topic.get_relevant_context(query)
+            dynamic_threshold = self.similarity_threshold * (len(query.split()) / 10)
+            if fallback_index != -1 and fallback_score >= dynamic_threshold:
+                start_index = max(0, fallback_index - 5)
+                end_index = min(len(self.current_topic.history), fallback_index + 6)
+                return self.current_topic.history[start_index:end_index]
+            
+            # Final fallback: return the last 10 messages.
+            return self.current_topic.history[-10:]
    
     async def get_relevant_files(self, query: str, top_k: int = 1, similarity_threshold: float = 0.36) -> list[tuple[str, str]]:
         """
@@ -399,22 +414,22 @@ class HistoryManager:
 
         # **Step 1: Direct file path match (prioritized)**
         normalized_query = query.lower()
-        direct_matches = [fp for fp in self.unsorted_topic.file_embeddings.keys() if normalized_query in fp.lower()]
+        direct_matches = [fp for fp in self.current_topic.file_embeddings.keys() if normalized_query in fp.lower()]
         
         if direct_matches:
             logger.info(f"Direct file path match found for query: {query}")
-            tasks = [self.unsorted_topic._read_file(fp) for fp in direct_matches[:top_k]]
+            tasks = [self.current_topic._read_file(fp) for fp in direct_matches[:top_k]]
             results = await asyncio.gather(*tasks)
             return [(fp, content) for fp, content in results if content]
 
         # **Step 2: Check for file name matches (if query matches only the filename)**
         filename_matches = [
-            fp for fp in self.unsorted_topic.file_embeddings.keys() if normalized_query in os.path.basename(fp).lower()
+            fp for fp in self.current_topic.file_embeddings.keys() if normalized_query in os.path.basename(fp).lower()
         ]
         
         if filename_matches:
             logger.info(f"File name match found for query: {query}")
-            tasks = [self.unsorted_topic._read_file(fp) for fp in filename_matches[:top_k]]
+            tasks = [self.current_topic._read_file(fp) for fp in filename_matches[:top_k]]
             results = await asyncio.gather(*tasks)
             return [(fp, content) for fp, content in results if content]
 
@@ -437,7 +452,7 @@ class HistoryManager:
             return await matched_topic.get_relevant_files(query, top_k, similarity_threshold)
         
         logger.info("No matching topic for files; using unsorted topic files.")
-        return await self.unsorted_topic.get_relevant_files(query, top_k, similarity_threshold)
+        return await self.current_topic.get_relevant_files(query, top_k, similarity_threshold)
 
 
 
@@ -467,7 +482,7 @@ class HistoryManager:
         return embedding
 
 
-    async def generate_prompt(self, query) -> str:
+    async def generate_prompt(self, query):
         """
         Generates a prompt by retrieving context and file references from the best matching topic.
         
@@ -479,17 +494,20 @@ class HistoryManager:
         """
         
         logger.info(f"Generating prompt for query: {query}")
-        context = await self.get_relevant_context(query)
+        relevant_topic = await self.get_relevant_topic(query)
         relevant_files = await self.get_relevant_files(query)
         file_references = ""
         for file_path, content in relevant_files:
-            file_references += f"\n[Referenced File: {file_path}]\n{content[:self.unsorted_topic.char_limit]}\n..."
-        prompt = f"Context:\n{context}\n\nUser Query: {query}\n\n{file_references}" if context or file_references else query
+            file_references += f"\n[Referenced File: {file_path}]\n{content[:self.current_topic.char_limit]}\n..."
+        prompt = f"{query}\n\n{file_references}" if file_references else query
+
         logger.info(f"Generated prompt: {prompt}")
-        return prompt
+        await self.add_message("user",prompt)
+
+        relevant_topic.append({"role": "user", "content": prompt})
+        return relevant_topic
 
 
-    
     async def generate_topic_info_from_history(self,history, max_retries: int = 3):
         """
         Attempts to extract a topic name and description from the given history.
@@ -538,87 +556,88 @@ class HistoryManager:
                     break
         return None, None
 
-    # --------------------- Helper Methods --------------------- #
-
-    async def _analyze_unsorted_history(self) -> None:
+    async def _analyze_history(self) -> None:
         """
-        If unsorted_topic has at least 10 messages, attempt to generate a new topic
-        from its history using the helper function.
+        Analyzes the current topic's history for potential off-topic drift.
+        When the history length reaches a multiple of 10, the method:
+          1. Takes a slice of the last 10 messages and generates candidate topic info.
+          2. Compares the candidate topic's embedding to the current topic's embedded description
+             using cosine similarity (threshold 0.7).
+          3. If the candidate slice is off-topic (similarity < 0.7), it then checks progressively
+             smaller slices (starting with the last two messages) to determine the precise start
+             of the off-topic segment.
+          4. Once identified, it attempts to match the candidate embedding with an existing topic
+             (excluding the current topic). If a match is found, the off-topic messages are reassigned;
+             otherwise, a new topic is created.
+          5. Finally, the off-topic messages are removed from the current topic.
         """
-        if len(self.unsorted_topic.history) >= 10:
-            logger.info("Attempting to analyze unsorted history for potential topic splitting.")
-            new_topic_name, new_topic_desc = await self.generate_topic_info_from_history(self.unsorted_topic.history)
+        # If the current topic is unnamed but has > 3 messages, generate a topic name/description.
+        if len(self.current_topic.history) > 3 and not self.current_topic.name.strip():
+            new_topic_name, new_topic_desc = await self.generate_topic_info_from_history(self.current_topic.history)
             if new_topic_name and new_topic_desc:
-                try:
-                    new_topic = Topic(new_topic_name, new_topic_desc)
-                    new_topic.embedded_description = await self.async_fetch_embedding(new_topic_desc)
-                    for msg in self.unsorted_topic.history.copy():
-                        embedding = await self.async_fetch_embedding(msg["message"])
-                        if embedding is None or len(embedding) == 0:
-                            continue
-                        similarity = cosine_similarity([embedding], [new_topic.embedded_description])[0][0]
-                        if similarity >= self.similarity_threshold:
-                            new_topic.add_message(msg["role"], msg["message"], embedding)
-                            self.unsorted_topic.history.remove(msg)
-                    if new_topic.history:
-                        self.topics.append(new_topic)
-                        logger.info(f"Created new topic '{new_topic_name}' from unsorted history after analysis.")
-                except Exception as e:
-                    logger.error(f"Error creating new topic from unsorted messages: {e}", exc_info=True)
+                self.current_topic.name = new_topic_name
+                self.current_topic.description = new_topic_desc
+                self.current_topic.embedded_description = await self.async_fetch_embedding(new_topic_desc)
+        
+        # Only trigger analysis when history length is a multiple of 10 (e.g. 10, 20, 30, …)
+        if len(self.current_topic.history) >= 10 and (len(self.current_topic.history) % 10 == 0):
+            logger.info("Analyzing current topic for potential off-topic segments.")
+            
+            # Take a candidate slice from the end – for example, the last 10 messages.
+            candidate_slice = self.current_topic.history[-10:]
+            candidate_topic_name, candidate_topic_desc = await self.generate_topic_info_from_history(candidate_slice)
+            if candidate_topic_name and candidate_topic_desc:
+                candidate_embedding = await self.async_fetch_embedding(candidate_topic_desc)
+                if candidate_embedding is not None and candidate_embedding.any():
+                    # Compute similarity between candidate slice embedding and current topic's embedded description.
+                    sim_to_current = cosine_similarity([candidate_embedding], [self.current_topic.embedded_description])[0][0]
+                    logger.debug(f"Candidate slice similarity to current topic: {sim_to_current:.4f}")
+                    
+                    if sim_to_current < 0.7:
+                        # Off-topic drift detected in the candidate slice.
+                        # Narrow down the off-topic segment by testing smaller slices.
+                        off_topic_start_index = len(self.current_topic.history) - 10  # initial candidate start.
+                        
+                        # Iterate from last 2 messages up to the full candidate slice.
+                        for i in range(2, 11):
+                            test_slice = self.current_topic.history[-i:]
+                            test_topic_name, test_topic_desc = await self.generate_topic_info_from_history(test_slice)
+                            if test_topic_name and test_topic_desc:
+                                test_embedding = await self.async_fetch_embedding(test_topic_desc)
+                                if test_embedding is not None and test_embedding.any():
+                                    test_sim = cosine_similarity([test_embedding], [self.current_topic.embedded_description])[0][0]
+                                    logger.debug(f"Testing last {i} messages: similarity = {test_sim:.4f}")
+                                    if test_sim >= 0.7:
+                                        # Found a slice that is still on-topic; thus, the off-topic segment likely starts
+                                        # right after this slice.
+                                        off_topic_start_index = len(self.current_topic.history) - i + 1
+                                        break
+                        # Slice the off-topic segment.
+                        off_topic_segment = self.current_topic.history[off_topic_start_index:]
+                        logger.info(f"Identified off-topic segment from index {off_topic_start_index} to end (total {len(off_topic_segment)} messages).")
+                        
+                        # Attempt to match the candidate embedding with an existing topic, excluding the current topic.
+                        matched_topic = await self._match_topic(candidate_embedding, exclude_topic=self.current_topic)
+                        if matched_topic is not None:
+                            for msg in off_topic_segment:
+                                msg_emb = await self.async_fetch_embedding(msg["content"])
+                                if msg_emb is not None and msg_emb.any():
+                                    matched_topic.add_message(msg["role"], msg["content"], msg_emb)
+                            logger.info(f"Reassigned off-topic segment of {len(off_topic_segment)} messages to existing topic '{matched_topic.name}'.")
+                        else:
+                            # No matching topic found – create a new topic.
+                            try:
+                                new_topic = Topic(candidate_topic_name, candidate_topic_desc)
+                                new_topic.embedded_description = candidate_embedding
+                                for msg in off_topic_segment:
+                                    msg_emb = await self.async_fetch_embedding(msg["content"])
+                                    if msg_emb is not None and msg_emb.any():
+                                        new_topic.add_message(msg["role"], msg["content"], msg_emb)
+                                self.topics.append(new_topic)
+                                logger.info(f"Created new topic '{new_topic.name}' with {len(off_topic_segment)} off-topic messages.")
+                            except Exception as e:
+                                logger.error(f"Error creating new topic from off-topic messages: {e}", exc_info=True)
+                        
+                        # Remove off-topic messages from the current topic.
+                        self.current_topic.history = self.current_topic.history[:off_topic_start_index]
 
-    async def _reevaluate_topics_off_messages(self) -> None:
-        """
-        Reevaluate each topic's messages. If a message's similarity to its current topic
-        is below the threshold, try to reassign it to a better-fitting topic or move it to unsorted_topic.
-        """
-        if len(self.topics) > 4:
-            for topic in self.topics:
-                if not topic.history or len(topic.history) < 20:
-                    continue
-                for msg in topic.history.copy():
-                    embedding = await self.async_fetch_embedding(msg["message"])
-                    if embedding is None or len(embedding) == 0:
-                        continue
-                    current_similarity = (cosine_similarity([embedding], [topic.embedded_description])[0][0]
-                                          if topic.embedded_description is not None and len(topic.embedded_description) > 0
-                                          else 0.0)
-                    if current_similarity < self.similarity_threshold:
-                        new_topic = await self._match_topic(embedding)
-                        if new_topic is not None and new_topic != topic:
-                            new_topic.add_message(msg["role"], msg["message"], embedding)
-                            topic.history.remove(msg)
-                            logger.info(f"Reassigned message from topic '{topic.name}' to '{new_topic.name}'.")
-                        elif new_topic is None:
-                            self.unsorted_topic.add_message(msg["role"], msg["message"], embedding)
-                            topic.history.remove(msg)
-                            logger.info(f"Moved message from topic '{topic.name}' to unsorted_topic due to low similarity.")
-
-    async def _reassign_topic_names(self) -> None:
-        """
-        For topics with auto-generated names that now have accumulated messages,
-        reassign a new name, description, and description embedding using the helper function.
-        """
-        for topic in self.topics:
-            if topic.name in ["Auto-generated topic", "Auto-generated file topic"] and topic.history:
-                logger.info(f"Attempting to reassign name for topic with auto-generated name (contains {len(topic.history)} messages).")
-                new_name, new_description = await self.generate_topic_info_from_history(topic.history)
-                if new_name and new_description:
-                    topic.name = new_name
-                    topic.description = new_description
-                    topic.embedded_description = await self.async_fetch_embedding(new_description)
-                    logger.info(f"Reassigned topic name to '{new_name}'.")
-
-    # --------------------- Main Evaluation Function --------------------- #
-
-    async def _evaluate_topics(self) -> None:
-        """
-        Main evaluation function that orchestrates topic evaluation by calling helper steps:
-          1. Analyze unsorted history for potential topic splitting.
-          2. Process unsorted_topic messages and file embeddings.
-          3. Reevaluate each topic for off-topic messages.
-          4. Reassign topic names for auto-generated topics.
-        """
-        logger.info(f"Current number of topics: {len(self.topics)}")
-        await self._analyze_unsorted_history()
-        await self._reevaluate_topics_off_messages()
-        await self._reassign_topic_names()

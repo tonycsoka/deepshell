@@ -41,7 +41,7 @@ class ChatManager:
             logger.info("Processing file: %s", file_name)
             await self.file_utils.process_file_or_folder(file_name)
             if not user_input:
-                user_input = f"Analyze {file_name}"
+                user_input = f"Analyze this content"
         
         elif file_content:
             logger.info("Pipe input detected.")
@@ -56,20 +56,24 @@ class ChatManager:
 
         user_input, bypass_flag = (user_input if isinstance(user_input, tuple) else (user_input, False))
           
-        input = await self.generate_prompt(user_input)
+        
         logger.info("Executing task manager.")
 
-        response = await self.task_manager(input, bypass_flag)
+        if bypass_flag or self.client.mode != Mode.DEFAULT:
+
+            return await self.task_manager(user_input = user_input,bypass = bypass_flag)
         
         if self.client.keep_history and self.client.mode != Mode.SHELL:
-            await self.add_to_history("user", user_input)
+            history = await self.generate_prompt(user_input)
+            logger.info(f"history generated :{history}")
+            response = await self.task_manager(history=history)
             await self.add_to_history("assistant", response)
+            return response
         
         logger.info("Deploy task completed.")
 
-        return response
 
-    async def task_manager(self, user_input, bypass=False):
+    async def task_manager(self, user_input = None, history = None, bypass = False):
         """
         Manages tasks based on the client's mode.
         """
@@ -89,7 +93,7 @@ class ChatManager:
             return await mode_handlers[self.client.mode](user_input)
         else:
             logger.info("Handling task in default mode.")
-            return await self._handle_default_mode(user_input)
+            return await self._handle_default_mode(input= user_input, history = history)
 
     async def _handle_shell_mode(self, input, bypass=False):
         """
@@ -142,17 +146,23 @@ class ChatManager:
 
         return code
 
-    async def _handle_default_mode(self, input, no_render=False, client=None, filtering=None):
+    async def _handle_default_mode(self, input= None, history = None, no_render=False):
         """
         Handles tasks when the client is in the default mode.
         """
         logger.info("Default mode execution started.")
         
-        if not client or not filtering:
-            client = self.client
-            filtering = self.filtering
-        
-        get_stream = asyncio.create_task(client._chat_stream(input))
+        client = self.client
+        filtering = self.filtering
+        if history and not input:
+            get_stream = asyncio.create_task(client._chat_stream(history = history))
+            logger.info("Passing the history to the chatbot")
+        elif input and not history:
+            get_stream = asyncio.create_task(client._chat_stream(input))
+        else:
+            logger.error("Invalid input")
+            return
+
         process_text = asyncio.create_task(filtering.process_stream(False))
         self.tasks = [get_stream, process_text]
         
