@@ -1,11 +1,14 @@
 import asyncio
-from ollama import AsyncClient
 from utils.logger import Logger
-from config.settings import Mode, MODE_CONFIGS
+from ollama import AsyncClient, embeddings
+from config.settings import Mode, MODE_CONFIGS, EMBEDDING_MODEL
 
 logger = Logger.get_logger()
 
 class OllamaClient:
+    # Class-level lock to ensure critical async functions do not run concurrently
+    _global_lock = asyncio.Lock()
+
     def __init__(self, host, model, config, mode, stream=True, render_output=True, show_thinking=False):
         logger.info("Initializing OllamaClient")
         self.client = AsyncClient(host=host)
@@ -46,48 +49,74 @@ class OllamaClient:
 
     async def _chat_stream(self, input=None, history=None):
         """Fetches response from the Ollama API and streams into output buffer."""
-        logger.info(f"{self.mode.name} started stream")
-        
-        if history:
-            input = history
-        else:
-            input = [{"role": "user", "content": input}]
+        async with OllamaClient._global_lock:
+            logger.info(f"{self.mode.name} started stream")
 
-        logger.debug(f"Chat request payload: {input}")
+            if history:
+                input = history
+            else:
+                input = [{"role": "user", "content": input}]
 
-        try:
-            async for part in await self.client.chat(
-                model=self.model,
-                messages=input,
-                options=self.config,
-                stream=self.stream
-            ):
+            logger.debug(f"Chat request payload: {input}")
+
+            try:
+                async for part in await self.client.chat(
+                    model=self.model,
+                    messages=input,
+                    options=self.config,
+                    stream=self.stream
+                ):
+                    if not self.pause_stream:
+                        content = part.get('message', {}).get('content', '') 
+                        await self.output_buffer.put(content)
+
                 if not self.pause_stream:
-                    content = part.get('message', {}).get('content', '') 
-                    await self.output_buffer.put(content)
-            
-            if not self.pause_stream:
-                await self.output_buffer.put(None)
-                logger.info("Chat stream ended successfully")
-        
-        except Exception as e:
-            logger.error(f"Error during chat stream: {e}")
+                    await self.output_buffer.put(None)
+                    logger.info("Chat stream ended successfully")
+
+            except Exception as e:
+                logger.error(f"Error during chat stream: {e}")
 
     async def _describe_image(self, image: str | None):
         """Describes an image using the vision model."""
-        logger.info("Starting image description")
-        
-        if not image:
-            logger.warning("No image provided")
-            return "No image provided"
+        async with OllamaClient._global_lock:
+            logger.info("Starting image description")
 
-        if self.mode == Mode.VISION:
-            message = [{'role': 'user', 'content': 'Briefly describe this image', 'images': [image]}]
-            
+            if not image:
+                logger.warning("No image provided")
+                return "No image provided"
+
+            if self.mode == Mode.VISION:
+                message = [{'role': 'user', 'content': 'Briefly describe this image', 'images': [image]}]
+
+                try:
+                    response = await self.client.chat(model=self.model, messages=message)
+                    logger.debug(f"Image description response: {response}")
+
+                    message_data = response.get('message')
+                    if not message_data:
+                        logger.warning("No message found in response")
+                        return "No message in response"
+
+                    content = message_data.get('content')
+                    return content if isinstance(content, str) else "No content found"
+                except Exception as e:
+                    logger.error(f"Error while describing image: {e}")
+                    return "Error processing image"
+
+    async def _fetch_response(self, input=None, history=None):
+        """Fetches a complete response from the model."""
+        async with OllamaClient._global_lock:
+            logger.info(f"{self.mode.name} is fetching response")
+
+            if history:
+                message = history
+            else:
+                message = [{'role': 'user', 'content': input}]
+
             try:
-                response = await AsyncClient().chat(model=self.model, messages=message)
-                logger.debug(f"Image description response: {response}")
-                
+                response = await self.client.chat(model=self.model, messages=message)
+                logger.info("Response received successfully")
                 message_data = response.get('message')
                 if not message_data:
                     logger.warning("No message found in response")
@@ -95,31 +124,26 @@ class OllamaClient:
 
                 content = message_data.get('content')
                 return content if isinstance(content, str) else "No content found"
+
             except Exception as e:
-                logger.error(f"Error while describing image: {e}")
-                return "Error processing image"
+                logger.error(f"Error fetching response: {e}")
+                return "Error fetching response"
 
-    async def _fetch_response(self, input=None, history=None):
-        """Fetches a complete response from the model."""
-        logger.info(f"{self.mode.name} is fetching response")
-
-        if history:
-            message = history
-        else:
-            message = [{'role': 'user', 'content': input}]
-        
-        try:
-            response = await AsyncClient().chat(model=self.model, messages=message)
-            logger.info("Response received successfully")
-            message_data = response.get('message')
-            if not message_data:
-                logger.warning("No message found in response")
-                return "No message in response"
-
-            content = message_data.get('content')
-            return content if isinstance(content, str) else "No content found"
-        
-        except Exception as e:
-            logger.error(f"Error fetching response: {e}")
-            return "Error fetching response"
+    @staticmethod
+    async def fetch_embedding(text: str):
+        """
+        Asynchronously fetches and caches an embedding for the given text while ensuring 
+        that no other locked operation (such as streaming) runs concurrently.
+        """
+        async with OllamaClient._global_lock:
+            try:
+                logger.info("Fetching embedding")
+                # Offload blocking work to a thread if needed
+                response = await asyncio.to_thread(embeddings, model=EMBEDDING_MODEL, prompt=text)
+                embedding = response['embedding']
+                logger.debug(f"Extracted {len(embedding)} embeddings")
+                return embedding
+            except Exception as e:
+                logger.error(f"Error fetching embedding for text: {text}. Error: {str(e)}")
+                return None
 
