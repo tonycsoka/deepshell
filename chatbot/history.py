@@ -66,7 +66,7 @@ class Topic:
         return best_similarity, best_index
 
 
-    def _index_file(self, file_path: str, embedding):
+    def _index_file(self, file_path: str,content, embedding):
         """
         Internal method to add a file's embedding (along with file name and path) to the topic.
         
@@ -79,6 +79,7 @@ class Topic:
         file_info = {
             "file_name": file_name,
             "full_path": file_path,
+            "content": content,
             "embedding": embedding
         }
        
@@ -97,7 +98,7 @@ class HistoryManager:
             top_k (int): Maximum number of context items to retrieve.
             similarity_threshold (float): Threshold for determining similarity.
         """
-        self.manager = manager
+        self.file_utils = manager.file_utils
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
         self.topics: list[Topic] = []
@@ -212,7 +213,7 @@ class HistoryManager:
 
         combined_content = f"Path: {file_path}\nContent: {content}"
         file_embedding = await self.fetch_embedding(combined_content)  # Ensure embedding function is async
-        self.current_topic._index_file(file_path, file_embedding)
+        self.current_topic._index_file(file_path,content,file_embedding)
 
 
     def add_folder_structure(self, structure,topic_name= None) -> None:
@@ -263,58 +264,77 @@ class HistoryManager:
             return match.group(0)
         return None 
         
-    
+    def extract_folder_from_query(self, query: str):
+        """
+        Extracts a folder path from the query.
+        This regex looks for paths containing at least one slash and that do not end with an extension.
+        """
+        folder_pattern = r"([a-zA-Z0-9_\-]+(?:/[a-zA-Z0-9_\-]+)+)"
+        match = re.search(folder_pattern, query)
+        if match:
+            candidate = match.group(0)
+            # If candidate does not end with a typical file extension, assume it's a folder.
+            if not re.search(r"\.[a-zA-Z0-9]+$", candidate):
+                return candidate
+        return None
  
+    
     async def get_relevant_files(self, query: str, top_k: int = 1, similarity_threshold: float = 0.3):
         """
-        Retrieves relevant files by performing cosine similarity between query and file embeddings.
-        The file embeddings are pre-computed with content, metadata, and file path combined.
+        Retrieves relevant files by comparing the query against the indexed file embeddings.
+        The indexed file info includes file name, full path, content, and embedding.
+        
+        For file queries, first try an exact file name match, then fallback to cosine similarity.
         """
-        # Extract potential file name or path from the query
-        file_name = self.extract_file_name_from_query(query)
-
-        # Always compute the query embedding (even if no file name is found)
+        # Check if the query references a folder.
         query_embedding = await self.fetch_embedding(query)
-
-        # Step 1: If a file name was extracted, attempt to match it first
         file_scores = []
+        
+        
+        # Try to extract a file name from the query.
+        file_name = self.extract_file_name_from_query(query)
         if file_name:
-            # Look for exact matches in current topic first
+            # Look for exact file name matches in the current topic.
             for file_path, file_info in self.current_topic.file_embeddings.items():
-                # Check if the file name is in the extracted query file name
-                if file_name.lower() in file_info['file_name'].lower():
-                    file_scores.append((file_path, 1.0))  # Full match
-
-            # If no exact match found, compute similarity based on embedding
+                if file_name.lower() in file_info["file_name"].lower():
+                    file_scores.append((file_path, 1.0))
+            
+            # If no exact match, fallback to cosine similarity using the stored embedding.
             if not file_scores:
                 for file_path, file_info in self.current_topic.file_embeddings.items():
-                    similarity = cosine_similarity([query_embedding], [file_info['embedding']])[0][0]
+                    similarity = cosine_similarity([query_embedding], [file_info["embedding"]])[0][0]
                     if similarity >= similarity_threshold:
                         file_scores.append((file_path, similarity))
-
-        # Step 2: If no relevant files found, expand the search across all topics
+        
+        # If no matches in the current topic, expand the search to all topics.
         if not file_scores:
             logger.info("No relevant files found in the current topic, expanding search across all topics.")
-            
             all_file_embeddings = {}
             for topic in self.topics:
                 all_file_embeddings.update(topic.file_embeddings)
-
             for file_path, file_info in all_file_embeddings.items():
-                similarity = cosine_similarity([query_embedding], [file_info['embedding']])[0][0]
+                similarity = cosine_similarity([query_embedding], [file_info["embedding"]])[0][0]
                 if similarity >= similarity_threshold:
                     file_scores.append((file_path, similarity))
-
-        # If we have file matches, sort by similarity and return the top_k files
+        
+        # If matches are found, sort by similarity and retrieve their content.
         if file_scores:
             file_scores.sort(key=lambda x: x[1], reverse=True)
             selected_file_paths = [fp for fp, _ in file_scores[:top_k]]
-            tasks = [self._read_file(fp) for fp in selected_file_paths]
-            results = await asyncio.gather(*tasks)
-            return [(fp, content) for fp, content in results if content]
+            results = []
+            for fp in selected_file_paths:
+                # If content is already stored in the file info, use it.
+                if fp in self.current_topic.file_embeddings and "content" in self.current_topic.file_embeddings[fp]:
+                    results.append((fp, self.current_topic.file_embeddings[fp]["content"]))
+                else:
+                    # Fallback: call self.open_file to get fresh content.
+                    file_path, content = await self._read_file(fp)
+                    results.append((fp, content))
+            return results
 
         logger.info("No matching file embeddings found")
         return None
+
 
     async def fetch_embedding(self, text: str) -> np.ndarray: 
         """
