@@ -1,8 +1,8 @@
-# DeepSeek-Shell
+# DeepShell
 
-![Deepseek-Shell](https://github.com/catoni0/deepseek_shell/blob/main/LOGO.png)
+![DeepShell](https://github.com/catoni0/deepseek_shell/blob/main/LOGO.png)
 
-_A whisper in the void, a tool forged in silence._ DeepSeek-Shell is your clandestine terminal companion, bridging the gap between human intent and AI execution. It speaks in commands, listens in context, and acts with precision. DeepSeek-Shell operates with local deepseek-r1 models, ensuring autonomy beyond the reach of prying eyes.
+_A whisper in the void, a tool forged in silence._ DeepShell is your clandestine terminal companion, bridging the gap between human intent and AI execution. It speaks in commands, listens in context, and acts with precision. DeepShell operates with local deepseek-r1 models, ensuring autonomy beyond the reach of prying eyes.
 
 ## Essence of the Tool
 
@@ -15,6 +15,13 @@ _A whisper in the void, a tool forged in silence._ DeepSeek-Shell is your clande
 - **Full Folder Analysis** – Decodes complex codebases and logs, understanding every nuance.
 - **Interactive Shell Mode** – Speak in natural language, and the AI will initiate the shell, interpreting commands, executing them, and weaving the output into a coherent, real-time markup stream.
 - **Contextual Awareness** – The AI distills relevant details from files, commands, and interactions, ensuring responses remain focused and precise, without straying into the irrelevant.
+
+## Claim the Artifact
+Not all tools are found. Some must be taken.
+
+🔗 [Take Hold of DeepShell](https://github.com/catoni0/deepshell/releases)
+
+It does not seek you. But now, it is yours.
 
 ## Awakening the Entity
 
