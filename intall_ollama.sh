@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Optional: Source your profile if needed.
+# Ensure we source the profile (if necessary)
 if [ -f ~/.bash_profile ]; then
   source ~/.bash_profile
 fi
@@ -14,7 +14,7 @@ export PATH="$OLLAMA_BIN:$OLLAMA_LIB:$PATH"
 # Debugging: print PATH.
 echo "Using PATH: $PATH"
 
-# Try to locate ollama.
+# Try to locate Ollama.
 if command -v ollama &> /dev/null; then
   OLLAMA=$(command -v ollama)
 elif [ -x "$OLLAMA_LIB/ollama" ]; then
@@ -39,13 +39,12 @@ $OLLAMA -v
 echo "Ollama is installed. Version: $($OLLAMA -v)"
 
 # Extract unique models from config/settings.py
-# This command finds lines ending in _MODEL definitions, extracts the model name,
-# sorts them uniquely, and then reads them into an array.
-readarray -t models_array < <(grep -E "^[A-Z_]+_MODEL\s*=" config/settings.py | sed 's/.*= *"\(.*\)".*/\1/' | sort -u)
-echo "Extracted unique models: ${models_array[*]}"
+MODELS=$(grep -E "^[A-Z_]+_MODEL\s*=" config/settings.py | sed 's/.*= *"\(.*\)".*/\1/' | sort -u)
+echo "Extracted unique models:"
+echo "$MODELS"
 
-# Iterate over each unique model and pull it if not present.
-for model in "${models_array[@]}"; do
+# Iterate over each model and pull it if not present.
+while IFS= read -r model; do
   echo "Checking for model: $model"
   if ! $OLLAMA list | grep -q "$model"; then
     echo "Model '$model' not found. Pulling..."
@@ -53,11 +52,15 @@ for model in "${models_array[@]}"; do
   else
     echo "Model '$model' is already available."
   fi
-done
+done <<EOF
+$MODELS
+EOF
 
 # Start the Ollama server.
 echo "Starting Ollama server..."
 $OLLAMA serve
+
+
 
 
 
