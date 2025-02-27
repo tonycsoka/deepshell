@@ -1,6 +1,6 @@
 # DeepShell
 
-![DeepShell](https://github.com/Abyss-c0re/deepseek_shell/blob/main/LOGO.png)
+![DeepShell](https://github.com/Abyss-c0re/deepshell/blob/main/LOGO.png)
 
 _A whisper in the void, a tool forged in silence._ DeepShell is your clandestine terminal companion, bridging the gap between human intent and AI execution. It speaks in commands, listens in context, and acts with precision. DeepShell operates with local deepseek-r1 models, ensuring autonomy beyond the reach of prying eyes.
 
