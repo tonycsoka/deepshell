@@ -35,7 +35,7 @@ ollama pull deepseek-r1:1.5b
 ollama pull deepseek-r1:7b
 ollama pull deepseek-coder-v2:16b
 ollama pull llama3.2-vision:11b
-ollama pull nomic-embed-text:latest"
+ollama pull nomic-embed-text:latest
 ollama serve 
 ```
 
