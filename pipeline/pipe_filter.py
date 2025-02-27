@@ -1,7 +1,7 @@
 import re
 import asyncio
-from config.settings import Mode
 from utils.logger import Logger
+from config.settings import Mode
 
 logger = Logger.get_logger()
 

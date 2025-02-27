@@ -57,11 +57,9 @@ class PromptHelper:
         Returns:
             str: A formatted prompt instructing the model to reply in JSON format.
         """
-        # Convert the history data into a human-readable format
         history_text = str(history)
         
         logger.debug(f"Topics helper: injected history: {history_text}")
-        # Instruction to respond in JSON format
         return f"""
         Based on the following conversation history, please name a topic and provide a description of that topic in JSON format:
 

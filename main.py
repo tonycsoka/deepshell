@@ -1,9 +1,10 @@
 import sys
 import asyncio
-from utils.symlink_utils import create_symlink, remove_symlink
-from chatbot.manager import ChatManager
 from utils.pipe_utils import PipeUtils
-from utils.args_utils import parse_args 
+from utils.args_utils import parse_args
+from chatbot.manager import ChatManager
+from utils.symlink_utils import create_symlink, remove_symlink
+
 
 def main():
     args = parse_args()

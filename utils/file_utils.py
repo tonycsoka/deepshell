@@ -97,21 +97,17 @@ class FileUtils:
 
    
     def _is_safe_file(self, file_path):
-        # Skip empty files immediately
         if os.path.getsize(file_path) == 0:
             logger.info(f"Skipping empty file: {file_path}")
             return False
 
-        # Allow files with known safe extensions
         if any(file_path.lower().endswith(ext) for ext in self.safe_extensions):
             return True  
 
-        # Check if the file has NO extension
         if '.' not in os.path.basename(file_path):
             logger.info(f"File '{file_path}' has no extension. Checking if it's a text file...")
             return self._is_text_file(file_path)  
 
-        # If it has an unknown extension, reject it
         return False
 
    
@@ -122,12 +118,10 @@ class FileUtils:
             
             logger.info(f"Detected MIME type for '{file_path}': {mime_type}")
             
-            # Ensure it starts with "text/"
             return mime_type.startswith("text")
         
         except Exception as e:
             logger.error(f"Error detecting MIME type for '{file_path}': {e}")
-            return False  # Assume non-text if an error occurs
 
 
     def _is_image(self, file_path):

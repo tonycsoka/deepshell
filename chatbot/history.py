@@ -38,7 +38,6 @@ class Project:
             "embedding": embedding
         }
        
-        # Add the file information to file_embeddings
         self.file_embeddings[file_path] = file_info
         logger.debug(f"Project '{self.name}': Added file {file_path}")
 
@@ -158,17 +157,13 @@ class HistoryManager:
         from the current project's name, the current project is archived and a new 
         project is created and assigned.
         """
-        # Extract candidate project name from file's directory
         new_project_name = os.path.basename(os.path.dirname(file_path))
         
-        # If the file belongs to a different project than the current one
         if self.current_project.name.lower() != new_project_name.lower():
-            # Archive current project (if it's not default unsorted)
             if self.current_project.name.lower() != "unsorted" and self.current_project not in self.projects:
                 self.projects.append(self.current_project)
                 logger.info(f"Archived project '{self.current_project.name}' to projects list.")
             
-            # Create a new project for the new folder and generate its structure
             new_project = Project(new_project_name)
             try:
                 folder_path = os.path.dirname(file_path)
@@ -180,7 +175,6 @@ class HistoryManager:
             
             self.current_project = new_project
 
-        # Process file embedding and index the file within the current project
         combined_content = f"Path: {file_path}\nContent: {content}"
         file_embedding = await self.fetch_embedding(combined_content)
         self.current_project._index_file(file_path, content, file_embedding)
@@ -197,7 +191,6 @@ class HistoryManager:
                 self.projects.append(self.current_project)
                 logger.info(f"Archived project '{self.current_project.name}' to projects list.")
 
-        # Update project name if empty or default ("Unsorted")
         if not self.current_project.name or self.current_project.name.lower() == "unsorted":
             if isinstance(structure, dict) and len(structure) == 1:
                 new_name = list(structure.keys())[0]
@@ -217,7 +210,7 @@ class HistoryManager:
                 if isinstance(value, dict):  # Subfolder
                     formatted += " " * indent + f"{key}/\n"
                     formatted += format_substructure(value, indent + 4)
-                else:  # File
+                else:
                     formatted += " " * indent + f"-- {value}\n"
             return formatted
         
@@ -236,7 +229,6 @@ class HistoryManager:
         return None   
 
     def extract_file_name_from_query(self,query: str):
-        # Regex to capture common file name patterns (with or without full path)
         file_pattern = r"([a-zA-Z0-9_\-]+(?:/[a-zA-Z0-9_\-]+)*/[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+|[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+)"
         match = re.search(file_pattern, query)
         if match:
@@ -252,12 +244,10 @@ class HistoryManager:
         match = re.search(folder_pattern, query)
         if match:
             candidate = match.group(0)
-            # If candidate does not end with a typical file extension, assume it's a folder.
             if not re.search(r"\.[a-zA-Z0-9]+$", candidate):
                 return candidate
         return None
 
- 
     
     async def get_relevant_files(self, query: str, top_k: int = 1, similarity_threshold: float = 0.6):
         """
@@ -266,15 +256,11 @@ class HistoryManager:
         
         For file queries, first try an exact file name match, then fallback to cosine similarity.
         """
-        # Check if the query references a folder.
         query_embedding = await self.fetch_embedding(query)
         file_scores = []
         
-        
-        # Try to extract a file name from the query.
         file_name = self.extract_file_name_from_query(query)
         if file_name:
-            # Look for exact file name matches in the current topic.
             for file_path, file_info in self.current_project.file_embeddings.items():
                 if file_name.lower() in file_info["file_name"].lower():
                     file_scores.append((file_path, 1.0))
@@ -286,7 +272,6 @@ class HistoryManager:
                     if similarity >= similarity_threshold:
                         file_scores.append((file_path, similarity))
         
-        # If no matches in the current topic, expand the search to all topics.
         if not file_scores:
             logger.info("No relevant files found in the current topic, expanding search across all topics.")
             all_file_embeddings = {}
@@ -297,17 +282,14 @@ class HistoryManager:
                 if similarity >= similarity_threshold:
                     file_scores.append((file_path, similarity))
         
-        # If matches are found, sort by similarity and retrieve their content.
         if file_scores:
             file_scores.sort(key=lambda x: x[1], reverse=True)
             selected_file_paths = [fp for fp, _ in file_scores[:top_k]]
             results = []
             for fp in selected_file_paths:
-                # If content is already stored in the file info, use it.
                 if fp in self.current_project.file_embeddings and "content" in self.current_project.file_embeddings[fp]:
                     results.append((fp, self.current_project.file_embeddings[fp]["content"]))
                 else:
-                    # Fallback: call self.open_file to get fresh content.
                     file_path, content = await self.current_project._read_file(fp)
                     results.append((fp, content))
             return results
@@ -322,7 +304,6 @@ class HistoryManager:
         Uses async lock to guard the caching mechanism.
         """
         async with asyncio.Lock():
-            # If the embedding is cached, return it
             if text in self.embedding_cache:
                 return self.embedding_cache[text]
 
@@ -356,7 +337,6 @@ class HistoryManager:
         Returns:
             Topic | None: The best matching topic if similarity exceeds the threshold.
         """
-        # Early exit if no topics are available.
         if len(self.topics) == 0:
             logger.info("No topics available for matching. Returning None.")
             return None
@@ -368,7 +348,6 @@ class HistoryManager:
             logger.debug(f"Computed similarity {similarity:.4f} for topic '{topic.name}'")
             return similarity, topic
 
-        # Exclude the specified topic from matching.
         tasks = [compute_similarity(topic) for topic in self.topics if topic != exclude_topic]
         results = await asyncio.gather(*tasks)
         
@@ -400,7 +379,6 @@ class HistoryManager:
         Returns:
             list: The last few messages from the topic's history.
         """
-        # Compute embedding for the query
         embedding = await self.fetch_embedding(query)
         
         # Determine the best matching topic and switch to it if found
@@ -409,27 +387,20 @@ class HistoryManager:
             await self.switch_topic(current_topic)
         
         # Retrieve the project folder structure if the query contains a folder name/path.
-        # This method should search your projects dictionary for a matching folder.
         project = self.find_project_structure(query)
         if project:
-            # Assign the retrieved structure to the current topic
             self.current_project = project
 
-        # Retrieve relevant files (using your existing logic that compares the combined embeddings)
         relevant_files = await self.get_relevant_files(query)
         file_references = ""
         
-               
-        # Append file references if relevant files were found.
         if relevant_files:
-        # If a folder structure is present, format it and include it in the prompt.
             if self.current_project.folder_structure:
                 file_references += f"Folder structure:\n{self.format_structure(self.current_project.folder_structure)}\n"
 
             for file_path, content in relevant_files:
                 file_references += f"\n[Referenced File: {file_path}]\n{content}\n..."
         
-        # Combine the query with any file references to form the prompt.
         prompt = f"{query}\n\n{file_references}" if file_references else query
         
         logger.info(f"Generated prompt: {prompt}")
