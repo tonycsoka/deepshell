@@ -15,6 +15,52 @@ logger = Logger.get_logger()
 
 helper, filter_helper = ChatBotDeployer.deploy_chatbot(Mode.HELPER)
 
+class Project:
+    def __init__(self,name = "") -> None:
+        self.name = name
+        self.file_embeddings: dict[str, dict] = {}
+        self.folder_structure: dict = {}
+
+    def _index_file(self, file_path: str,content, embedding):
+        """
+        Internal method to add a file's embedding (along with file name and path) to the topic.
+        
+        Args:
+            file_path (str): The file's path.
+            content (str): The file content.
+            embedding (np.ndarray): Pre-computed embedding of the content.
+        """
+        file_name = os.path.basename(file_path)
+        file_info = {
+            "file_name": file_name,
+            "full_path": file_path,
+            "content": content,
+            "embedding": embedding
+        }
+       
+        # Add the file information to file_embeddings
+        self.file_embeddings[file_path] = file_info
+        logger.debug(f"Project '{self.name}': Added file {file_path}")
+
+    async def _read_file(self, file_path: str) -> tuple[str, str]:
+        """
+        Asynchronously reads a file.
+        
+        Args:
+            file_path (str): The file's path.
+        
+        Returns:
+            tuple[str, str]: The file path and its content.
+        """
+        try:
+            async with aiofiles.open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = await f.read()
+            return file_path, content
+        except (IOError, OSError) as e:
+            logger.error(f" Error reading file {file_path}: {str(e)}")
+            return file_path, ""
+
+
 class Topic:
     def __init__(self, name="", description="") -> None:
         """
@@ -30,10 +76,8 @@ class Topic:
         self.embedded_description = np.array([])
         self.history: list[dict[str, str]] = []
         self.history_embeddings = [] 
-        self.file_embeddings: dict[str, dict] = {}  # Stores file info as dictionary (name, full path, embedding)
         self.embedding_cache: dict[str, np.ndarray] = {}
-        self.folder_structure: dict = {}
-
+  
     async def add_message(self, role, message, embedding):
         """Stores raw messages and their embeddings."""
         self.history.append({"role": role, "content": message})
@@ -65,28 +109,6 @@ class Topic:
         
         return best_similarity, best_index
 
-
-    def _index_file(self, file_path: str,content, embedding):
-        """
-        Internal method to add a file's embedding (along with file name and path) to the topic.
-        
-        Args:
-            file_path (str): The file's path.
-            content (str): The file content.
-            embedding (np.ndarray): Pre-computed embedding of the content.
-        """
-        file_name = os.path.basename(file_path)
-        file_info = {
-            "file_name": file_name,
-            "full_path": file_path,
-            "content": content,
-            "embedding": embedding
-        }
-       
-        # Add the file information to file_embeddings
-        self.file_embeddings[file_path] = file_info
-        logger.debug(f"Topic '{self.name}': Added file {file_path}")
-
  
 class HistoryManager:
     def __init__(self,manager, top_k: int = 2, similarity_threshold: float = 0.5) -> None:
@@ -104,8 +126,9 @@ class HistoryManager:
         self.topics: list[Topic] = []
         self.current_topic = Topic()
         self.embedding_cache: dict[str, np.ndarray] = {}
-        self.projects =  {}
-
+        self.projects: list[Project] = []
+        self.current_project = Project("Unsorted")
+    
 
     async def add_message(self, role, message,embedding = None) -> None:
         """
@@ -126,25 +149,192 @@ class HistoryManager:
         asyncio.create_task(self._analyze_history())
 
 
-    async def _read_file(self, file_path: str) -> tuple[str, str]:
+   
+    async def add_file(self, file_path: str, content: str) -> None:
         """
-        Asynchronously reads a file.
-        
-        Args:
-            file_path (str): The file's path.
-        
-        Returns:
-            tuple[str, str]: The file path and its content.
+        Adds a file by computing its combined embedding (file path + content) 
+        and routing it to the appropriate project based on the file's folder.
+        If the file's project folder (extracted from the file path) is different 
+        from the current project's name, the current project is archived and a new 
+        project is created and assigned.
         """
-        try:
-            async with aiofiles.open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = await f.read()
-            return file_path, content
-        except (IOError, OSError) as e:
-            logger.error(f" Error reading file {file_path}: {str(e)}")
-            return file_path, ""
+        # Extract candidate project name from file's directory
+        new_project_name = os.path.basename(os.path.dirname(file_path))
+        
+        # If the file belongs to a different project than the current one
+        if self.current_project.name.lower() != new_project_name.lower():
+            # Archive current project (if it's not default unsorted)
+            if self.current_project.name.lower() != "unsorted" and self.current_project not in self.projects:
+                self.projects.append(self.current_project)
+                logger.info(f"Archived project '{self.current_project.name}' to projects list.")
+            
+            # Create a new project for the new folder and generate its structure
+            new_project = Project(new_project_name)
+            try:
+                folder_path = os.path.dirname(file_path)
+                structure = self.file_utils.generate_structure(folder_path, folder_path)
+                new_project.folder_structure = structure
+                logger.info(f"Generated new folder structure for project '{new_project_name}'.")
+            except Exception as e:
+                logger.error(f"Failed to generate structure for project '{new_project_name}': {e}")
+            
+            self.current_project = new_project
+
+        # Process file embedding and index the file within the current project
+        combined_content = f"Path: {file_path}\nContent: {content}"
+        file_embedding = await self.fetch_embedding(combined_content)
+        self.current_project._index_file(file_path, content, file_embedding)
+
+    def add_folder_structure(self, structure) -> None:
+        """
+        Adds or updates folder structure for the current project.
+        If a structure already exists, archives the current project by adding it
+        to the projects list (if not already present) before updating.
+        Also, if the current project's name is empty or 'Unsorted', assigns the new folder name.
+        """
+        if self.current_project.folder_structure:
+            if self.current_project not in self.projects:
+                self.projects.append(self.current_project)
+                logger.info(f"Archived project '{self.current_project.name}' to projects list.")
+
+        # Update project name if empty or default ("Unsorted")
+        if not self.current_project.name or self.current_project.name.lower() == "unsorted":
+            if isinstance(structure, dict) and len(structure) == 1:
+                new_name = list(structure.keys())[0]
+                self.current_project.name = new_name
+                logger.info(f"Assigned new project name '{new_name}' from folder structure.")
+
+        self.current_project.folder_structure = structure
+        logger.info(f"Folder structure updated for project '{self.current_project.name}'.")
+
+    def format_structure(self, folder_structure):
+        """
+        Formats the folder structure dictionary into a readable string format.
+        """
+        def format_substructure(substructure, indent=0):
+            formatted = ""
+            for key, value in substructure.items():
+                if isinstance(value, dict):  # Subfolder
+                    formatted += " " * indent + f"{key}/\n"
+                    formatted += format_substructure(value, indent + 4)
+                else:  # File
+                    formatted += " " * indent + f"-- {value}\n"
+            return formatted
+        
+        return format_substructure(folder_structure)
+
+    def find_project_structure(self, query: str) -> Project | None:
+        """
+        Checks if the query contains a folder name corresponding to one of the existing projects.
+        Returns the matching Project if found.
+        """
+        for project in self.projects:
+            if project.name.lower() in query.lower():
+                logger.info(f"Found project structure for '{project.name}' in query")
+                return project
+        logger.info("No matching project found in query")
+        return None   
+
+    def extract_file_name_from_query(self,query: str):
+        # Regex to capture common file name patterns (with or without full path)
+        file_pattern = r"([a-zA-Z0-9_\-]+(?:/[a-zA-Z0-9_\-]+)*/[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+|[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+)"
+        match = re.search(file_pattern, query)
+        if match:
+            return match.group(0)
+        return None 
+        
+    def extract_folder_from_query(self, query: str):
+        """
+        Extracts a folder path from the query.
+        This regex looks for paths containing at least one slash and that do not end with an extension.
+        """
+        folder_pattern = r"([a-zA-Z0-9_\-]+(?:/[a-zA-Z0-9_\-]+)+)"
+        match = re.search(folder_pattern, query)
+        if match:
+            candidate = match.group(0)
+            # If candidate does not end with a typical file extension, assume it's a folder.
+            if not re.search(r"\.[a-zA-Z0-9]+$", candidate):
+                return candidate
+        return None
+
+ 
+    
+    async def get_relevant_files(self, query: str, top_k: int = 1, similarity_threshold: float = 0.6):
+        """
+        Retrieves relevant files by comparing the query against the indexed file embeddings.
+        The indexed file info includes file name, full path, content, and embedding.
+        
+        For file queries, first try an exact file name match, then fallback to cosine similarity.
+        """
+        # Check if the query references a folder.
+        query_embedding = await self.fetch_embedding(query)
+        file_scores = []
+        
+        
+        # Try to extract a file name from the query.
+        file_name = self.extract_file_name_from_query(query)
+        if file_name:
+            # Look for exact file name matches in the current topic.
+            for file_path, file_info in self.current_project.file_embeddings.items():
+                if file_name.lower() in file_info["file_name"].lower():
+                    file_scores.append((file_path, 1.0))
+            
+            # If no exact match, fallback to cosine similarity using the stored embedding.
+            if not file_scores:
+                for file_path, file_info in self.current_project.file_embeddings.items():
+                    similarity = cosine_similarity([query_embedding], [file_info["embedding"]])[0][0]
+                    if similarity >= similarity_threshold:
+                        file_scores.append((file_path, similarity))
+        
+        # If no matches in the current topic, expand the search to all topics.
+        if not file_scores:
+            logger.info("No relevant files found in the current topic, expanding search across all topics.")
+            all_file_embeddings = {}
+            for project in self.projects:
+                all_file_embeddings.update(project.file_embeddings)
+            for file_path, file_info in all_file_embeddings.items():
+                similarity = cosine_similarity([query_embedding], [file_info["embedding"]])[0][0]
+                if similarity >= similarity_threshold:
+                    file_scores.append((file_path, similarity))
+        
+        # If matches are found, sort by similarity and retrieve their content.
+        if file_scores:
+            file_scores.sort(key=lambda x: x[1], reverse=True)
+            selected_file_paths = [fp for fp, _ in file_scores[:top_k]]
+            results = []
+            for fp in selected_file_paths:
+                # If content is already stored in the file info, use it.
+                if fp in self.current_project.file_embeddings and "content" in self.current_project.file_embeddings[fp]:
+                    results.append((fp, self.current_project.file_embeddings[fp]["content"]))
+                else:
+                    # Fallback: call self.open_file to get fresh content.
+                    file_path, content = await self.current_project._read_file(fp)
+                    results.append((fp, content))
+            return results
+
+        logger.info("No matching file embeddings found")
+        return None
 
 
+    async def fetch_embedding(self, text: str) -> np.ndarray: 
+        """
+        Asynchronously fetches and caches an embedding for the given text.
+        Uses async lock to guard the caching mechanism.
+        """
+        async with asyncio.Lock():
+            # If the embedding is cached, return it
+            if text in self.embedding_cache:
+                return self.embedding_cache[text]
+
+        embedding = await OllamaClient.fetch_embedding(text)
+        if embedding:
+            self.embedding_cache[text] = embedding
+            logger.debug(f"Extracted {len(embedding)} embeddings")
+            return embedding
+        else:
+            return np.array([])
+       
+    
     async def switch_topic(self,topic):
         async with asyncio.Lock():
             if topic.name != self.current_topic.name:
@@ -197,164 +387,6 @@ class HistoryManager:
             return None
         
 
-
-   
-    async def add_file(self, file_path: str, content: str) -> None:
-        """
-        Adds a file by computing its combined embedding (file path + content) 
-        and routing it to the best matching topic.
-        The file is added to the unsorted topic.
-
-        Args:
-            file_path (str): The file's path. 
-            content (str): The file content.
-
-        """
-
-        combined_content = f"Path: {file_path}\nContent: {content}"
-        file_embedding = await self.fetch_embedding(combined_content)  # Ensure embedding function is async
-        self.current_topic._index_file(file_path,content,file_embedding)
-
-
-    def add_folder_structure(self, structure,topic_name= None) -> None:
-        """
-        Adds or updates folder structure.
-        If topic_name is provided, the folder structure is applied to that topic;
-        otherwise, it is applied to the unsorted topic.
-        
-        Args:
-            structure (dict): The folder structure.
-            topic_name (str | None): Optional topic name.
-        """
-        if topic_name:
-            topic_name.folder_structure = structure                
-            logger.info(f"Folder structure updated for topic: {topic_name}")
-            return
-
-        logger.warning(f"Topic '{topic_name}' not found. Applying folder structure to unsorted topic.")
-        self.current_topic.folder_structure = structure
-        logger.info("Folder structure updated for unsorted topic.")
-
-
-
-    def find_project_structure(self, query):
-        """
-        Checks if the query contains a folder name and retrieves the stored structure if found.
-
-        Args:
-            query (str): The user query.
-        
-        Returns:
-            dict | None: The folder structure if found, else None.
-        """
-        for project_name in self.projects:
-            if project_name.lower() in query.lower():
-                logger.info(f"Found project structure for '{project_name}' in query")
-                return self.projects[project_name]
-        
-        logger.info("No matching project found in query")
-        return None
-    
-
-    def extract_file_name_from_query(self,query: str):
-        # Regex to capture common file name patterns (with or without full path)
-        file_pattern = r"([a-zA-Z0-9_\-]+(?:/[a-zA-Z0-9_\-]+)*/[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+|[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+)"
-        match = re.search(file_pattern, query)
-        if match:
-            return match.group(0)
-        return None 
-        
-    def extract_folder_from_query(self, query: str):
-        """
-        Extracts a folder path from the query.
-        This regex looks for paths containing at least one slash and that do not end with an extension.
-        """
-        folder_pattern = r"([a-zA-Z0-9_\-]+(?:/[a-zA-Z0-9_\-]+)+)"
-        match = re.search(folder_pattern, query)
-        if match:
-            candidate = match.group(0)
-            # If candidate does not end with a typical file extension, assume it's a folder.
-            if not re.search(r"\.[a-zA-Z0-9]+$", candidate):
-                return candidate
-        return None
- 
-    
-    async def get_relevant_files(self, query: str, top_k: int = 1, similarity_threshold: float = 0.3):
-        """
-        Retrieves relevant files by comparing the query against the indexed file embeddings.
-        The indexed file info includes file name, full path, content, and embedding.
-        
-        For file queries, first try an exact file name match, then fallback to cosine similarity.
-        """
-        # Check if the query references a folder.
-        query_embedding = await self.fetch_embedding(query)
-        file_scores = []
-        
-        
-        # Try to extract a file name from the query.
-        file_name = self.extract_file_name_from_query(query)
-        if file_name:
-            # Look for exact file name matches in the current topic.
-            for file_path, file_info in self.current_topic.file_embeddings.items():
-                if file_name.lower() in file_info["file_name"].lower():
-                    file_scores.append((file_path, 1.0))
-            
-            # If no exact match, fallback to cosine similarity using the stored embedding.
-            if not file_scores:
-                for file_path, file_info in self.current_topic.file_embeddings.items():
-                    similarity = cosine_similarity([query_embedding], [file_info["embedding"]])[0][0]
-                    if similarity >= similarity_threshold:
-                        file_scores.append((file_path, similarity))
-        
-        # If no matches in the current topic, expand the search to all topics.
-        if not file_scores:
-            logger.info("No relevant files found in the current topic, expanding search across all topics.")
-            all_file_embeddings = {}
-            for topic in self.topics:
-                all_file_embeddings.update(topic.file_embeddings)
-            for file_path, file_info in all_file_embeddings.items():
-                similarity = cosine_similarity([query_embedding], [file_info["embedding"]])[0][0]
-                if similarity >= similarity_threshold:
-                    file_scores.append((file_path, similarity))
-        
-        # If matches are found, sort by similarity and retrieve their content.
-        if file_scores:
-            file_scores.sort(key=lambda x: x[1], reverse=True)
-            selected_file_paths = [fp for fp, _ in file_scores[:top_k]]
-            results = []
-            for fp in selected_file_paths:
-                # If content is already stored in the file info, use it.
-                if fp in self.current_topic.file_embeddings and "content" in self.current_topic.file_embeddings[fp]:
-                    results.append((fp, self.current_topic.file_embeddings[fp]["content"]))
-                else:
-                    # Fallback: call self.open_file to get fresh content.
-                    file_path, content = await self._read_file(fp)
-                    results.append((fp, content))
-            return results
-
-        logger.info("No matching file embeddings found")
-        return None
-
-
-    async def fetch_embedding(self, text: str) -> np.ndarray: 
-        """
-        Asynchronously fetches and caches an embedding for the given text.
-        Uses async lock to guard the caching mechanism.
-        """
-        async with asyncio.Lock():
-            # If the embedding is cached, return it
-            if text in self.embedding_cache:
-                return self.embedding_cache[text]
-
-        embedding = await OllamaClient.fetch_embedding(text)
-        if embedding:
-            self.embedding_cache[text] = embedding
-            logger.debug(f"Extracted {len(embedding)} embeddings")
-            return embedding
-        else:
-            return np.array([])
-       
-    
     
     async def generate_prompt(self, query, num_messages=5):
         """
@@ -378,21 +410,22 @@ class HistoryManager:
         
         # Retrieve the project folder structure if the query contains a folder name/path.
         # This method should search your projects dictionary for a matching folder.
-        project_structure = self.find_project_structure(query)
-        if project_structure:
+        project = self.find_project_structure(query)
+        if project:
             # Assign the retrieved structure to the current topic
-            self.current_topic.folder_structure = project_structure
+            self.current_project = project
 
         # Retrieve relevant files (using your existing logic that compares the combined embeddings)
         relevant_files = await self.get_relevant_files(query)
         file_references = ""
         
-        # If a folder structure is present, format it and include it in the prompt.
-        if self.current_topic.folder_structure:
-            file_references += f"Folder structure:\n{self.format_structure(self.current_topic.folder_structure)}\n"
-        
+               
         # Append file references if relevant files were found.
         if relevant_files:
+        # If a folder structure is present, format it and include it in the prompt.
+            if self.current_project.folder_structure:
+                file_references += f"Folder structure:\n{self.format_structure(self.current_project.folder_structure)}\n"
+
             for file_path, content in relevant_files:
                 file_references += f"\n[Referenced File: {file_path}]\n{content}\n..."
         
@@ -403,23 +436,6 @@ class HistoryManager:
         await self.add_message("user", prompt, embedding)
         
         return self.current_topic.history[-num_messages:]
-
-
-    def format_structure(self, folder_structure):
-        """
-        Formats the folder structure dictionary into a readable string format.
-        """
-        def format_substructure(substructure, indent=0):
-            formatted = ""
-            for key, value in substructure.items():
-                if isinstance(value, dict):  # Subfolder
-                    formatted += " " * indent + f"{key}/\n"
-                    formatted += format_substructure(value, indent + 4)
-                else:  # File
-                    formatted += " " * indent + f"-- {value}\n"
-            return formatted
-        
-        return format_substructure(folder_structure)
 
 
     async def generate_topic_info_from_history(self,history, max_retries: int = 3):
@@ -470,7 +486,6 @@ class HistoryManager:
                     break
         return None, None
 
- 
     
     async def _analyze_history(
         self,
