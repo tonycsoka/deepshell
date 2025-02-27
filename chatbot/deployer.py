@@ -16,10 +16,7 @@ class ChatBotDeployer:
         """
         Deploys a chatbot with an optional mode.
         """
-        client_deployer = ClientDeployer()  # Creating an instance inside the static method
+        client_deployer = ClientDeployer(mode)  # Creating an instance inside the static method
         chatbot = client_deployer.deploy()
-        if mode:
-            chatbot.switch_mode(mode)
-        logger.info(f"Chatbot deployed in {chatbot.mode.name}")
         return chatbot, PipeFilter(chatbot)
 

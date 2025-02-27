@@ -17,8 +17,8 @@ class FileUtils:
     def __init__(self, manager, safe_extensions=None, ignore_folders=None, scan_dot_folders=False):
     
         self.ui = manager.ui
-        self.add_file = manager.add_file
-        self.add_folder = manager.add_folder
+        self.index_file = None
+        self.add_folder = None
 
         self.default_safe_extensions = SUPPORTED_EXTENSIONS
         self.safe_extensions = safe_extensions or self.default_safe_extensions
@@ -28,11 +28,17 @@ class FileUtils:
         self.max_file_size = MAX_FILE_SIZE
         self.max_lines = MAX_LINES
         self.chunk_size = CHUNK_SIZE
+        self.file_locks = {}
 
         if PROCESS_IMAGES:
             deployer = ChatBotDeployer()
             self.image_processor, _ = deployer.deploy_chatbot(Mode.VISION)
 
+
+    def set_index_functions(self, index_file, add_folder):
+        self.index_file = index_file
+        self.add_folder = add_folder
+        
     async def process_file_or_folder(self, target):
         target = target.strip()
        
@@ -44,7 +50,9 @@ class FileUtils:
             target = choice
 
         if os.path.isfile(target):
-            await self.read_file(target)
+            content = await self.read_file(target)
+            if self.index_file:
+                await self.index_file(target, content)
         elif os.path.isdir(target):
             await self.read_folder(target)
 
@@ -52,34 +60,40 @@ class FileUtils:
         await self._print_message("\n[cyan]System:[/cyan] File processing complete, submiting the input to the chatbot")
 
 
+   
     async def read_file(self, file_path):
-        try: 
+        try:
             if not self._is_safe_file(file_path):
                 logger.info(f"Skipping file (unsupported): {file_path}")
-                return        
+                return
 
-            if PROCESS_IMAGES:
-                if self._is_image(file_path):
-                    await self._print_message(f"[green]\nProcessing the image: {file_path}[/green]")
-                    return await self._process_image(file_path)
-            else: 
-                if self._is_image(file_path):
-                    logger.info(f"Skipping image file {file_path}")
+            # Create a lock for this file if it doesn't exist yet
+            if file_path not in self.file_locks:
+                self.file_locks[file_path] = asyncio.Lock()
 
-            await self._print_message(f"[green]\nReading {file_path}[/green]")
-            
-            if os.path.getsize(file_path) > self.max_file_size:
-                content = await self._read_last_n_lines(file_path, self.max_lines)
-            else:
-                async with aiofiles.open(file_path, 'r', encoding="utf-8", errors="ignore") as file:
-                    content = await file.read()
+            # Use the lock for this file
+            async with self.file_locks[file_path]:
+                if PROCESS_IMAGES:
+                    if self._is_image(file_path):
+                        await self._print_message(f"[green]\nProcessing the image: {file_path}[/green]")
+                        return await self._process_image(file_path)
+                else:
+                    if self._is_image(file_path):
+                        logger.info(f"Skipping image file {file_path}")
 
+                await self._print_message(f"[green]\nReading {file_path}[/green]")
 
-            await self.add_file(file_path,content)
-          
-    
+                if os.path.getsize(file_path) > self.max_file_size:
+                    content = await self._read_last_n_lines(file_path, self.max_lines)
+                else:
+                    async with aiofiles.open(file_path, 'r', encoding="utf-8", errors="ignore") as file:
+                        content = await file.read()
+
+                return content
+
         except Exception as e:
             logger.error(f"Error reading file {file_path}: {e}")
+
 
    
     def _is_safe_file(self, file_path):
@@ -137,7 +151,7 @@ class FileUtils:
             encoded_image = await loop.run_in_executor(None, resize_and_encode)
             description =  await self.image_processor._describe_image(encoded_image)
             logger.info(f"Processed {file_path}")
-            await self.add_file(file_path,f"Image description by the vision model: {description}")
+            return f"Image description by the vision model: {description}"
         except Exception as e:
             logger.error(f"Error processing image {file_path}: {e}")
 
@@ -175,28 +189,30 @@ class FileUtils:
   
     def generate_structure(self, folder_path, root_folder, prefix=""):
         """
-        Generates a textual representation of the folder structure.
+        Generates a dictionary representation of the folder structure.
         All files within the folder are included, regardless of file type.
         """
         logger.info(f"Generating structure for {folder_path}")
-       
-        structure = f"{prefix}{os.path.basename(folder_path)}/\n"
-        
+
+        structure = {}
+        folder_name = os.path.basename(folder_path)
+        structure[folder_name] = {}
+
         try:
             items = sorted(os.listdir(folder_path))
         except Exception as e:
             logger.error(f"Error reading folder {folder_path}: {e}")
             return structure
-        
+
         for item in items:
             item_path = os.path.join(folder_path, item)
             if os.path.isdir(item_path) and item not in self.ignore_folders and (self.scan_dot_folders or not item.startswith('.')):
-                structure += self.generate_structure(item_path, root_folder, prefix + "--")
+                structure[folder_name][item] = self.generate_structure(item_path, root_folder, prefix + "--")
             elif os.path.isfile(item_path):
                 relative_path = os.path.relpath(item_path, root_folder) if root_folder else item_path
-                structure += f"{prefix}-- {relative_path}\n"
-        
-        logger.debug(f"folder_structure: {structure}")
+                structure[folder_name][item] = relative_path
+
+        logger.debug(f"Folder structure: {structure}")
         return structure
    
     async def read_folder(self, folder_path, root_folder=None):
@@ -212,10 +228,10 @@ class FileUtils:
 
         try:
             await self._print_message(f"\nGenerating structure for {folder_path}")
-            structure = self.generate_structure(folder_path,root_folder)
-            self.add_folder(structure)
-
-            # Collecting content of all files
+            generated_structure = self.generate_structure(folder_path,root_folder)
+            if self.add_folder:
+                self.add_folder(generated_structure)
+                        # Collecting content of all files
             for root, _, files in os.walk(folder_path):
                 if any(ignored in root.split(os.sep) for ignored in self.ignore_folders):
                     continue
@@ -224,7 +240,13 @@ class FileUtils:
                     if not any(file.lower().endswith(ext) for ext in self.safe_extensions):
                         logger.info( f"\nSkipping file (unsupported): {file_path}\n")
                     else:
-                        await self.read_file(file_path)
+                        content = await self.read_file(file_path)
+                        if self.index_file and content:
+                            await self.index_file(file_path, content)
+                        elif content:
+                            file_contents = f"\n{content.strip()}\n"
+                            if file_contents:
+                                return file_contents
                         
 
             logger.info(f"Reading files in {folder_path} complete")

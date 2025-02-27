@@ -18,16 +18,16 @@ class ChatManager:
     def __init__(self):
         self.client, self.filtering = ChatBotDeployer.deploy_chatbot() 
         self.ui = ChatMode(self) if self.client.render_output else None
-
-        self.history_manager = HistoryManager()
-        self.add_to_history = self.history_manager.add_message 
-        self.generate_prompt = self.history_manager.generate_prompt
-        self.add_file = self.history_manager.add_file
-        self.add_folder = self.history_manager.add_folder_structure
-
+        
         self.command_processor = CommandProcessor(self)
         self.file_utils = self.command_processor.file_utils
         self.executor = self.command_processor.executor
+
+        self.history_manager = HistoryManager(self)
+        self.add_to_history = self.history_manager.add_message 
+        self.generate_prompt = self.history_manager.generate_prompt
+
+        self.file_utils.set_index_functions(self.history_manager.add_file,self.history_manager.add_folder_structure)
 
         self.tasks = []
        
@@ -65,7 +65,6 @@ class ChatManager:
         
         if self.client.keep_history and self.client.mode != Mode.SHELL:
             history = await self.generate_prompt(user_input)
-            logger.info(f"history generated :{history}")
             response = await self.task_manager(history=history)
             await self.add_to_history("assistant", response)
             return response
