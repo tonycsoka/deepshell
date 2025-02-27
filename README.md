@@ -14,15 +14,29 @@ _A whisper in the void, a tool forged in silence._ DeepSeek-Shell is your clande
 - **Asynchronous File Handling** – Processes large files effortlessly, without blocking the flow of execution.
 - **Full Folder Analysis** – Decodes complex codebases and logs, understanding every nuance.
 - **Interactive Shell Mode** – Speak in natural language, and the AI will initiate the shell, interpreting commands, executing them, and weaving the output into a coherent, real-time markup stream.
+- **Contextual Awareness** – The AI distills relevant details from files, commands, and interactions, ensuring responses remain focused and precise, without straying into the irrelevant.
 
 ## Awakening the Entity
 
-Ensure the deepseek-r1 model is within your grasp:
+Ensure the deepseek is within your grasp:
+
+```sh
+chmod +x intall_ollama.sh
+sh install_ollama.sh
+```
+This shall intall ollama and pull the required models from /config/settings.py
+If one is not plannigng to use vision model, empty the `VISION_MODEL = ""` string, to avoid downloading.
+
+For those who prefer the traditional way:
 
 ```sh
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull deepseek-r1:14b
-ollama serve
+ollama pull deepseek-r1:1.5b
+ollama pull deepseek-r1:7b
+ollama pull deepseek-coder-v2:16b
+ollama pull llama3.2-vision:11b
+ollama pull nomic-embed-text:latest"
+ollama serve 
 ```
 
 Prepare the tool for execution:
@@ -43,6 +57,8 @@ This binds DeepSeek-Shell to your system, making it accessible from anywhere.
 ## Sculpting the Intent
 
 DeepSeek-Shell’s behavior is governed by the `config/settings.py` file.
+
+One may enable image processing there if so desired.
 
 ## The Art of Invocation
 
