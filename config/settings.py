@@ -62,6 +62,6 @@ SUPPORTED_EXTENSIONS = [
     '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.svg'
 ]
 
-IGNORED_FOLDERS =  ['__pycache__', '.git', '.svn', '.hg', 'android-studio', 'miniconda3']
+IGNORED_FOLDERS =  ['__pycache__', '.git', '.svn', '.hg', 'Android', 'android-studio', 'miniconda3']
 
 
