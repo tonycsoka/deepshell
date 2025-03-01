@@ -1,4 +1,5 @@
 import platform
+from datetime import datetime
 from utils.logger import Logger
 
 logger = Logger.get_logger()
@@ -9,6 +10,7 @@ class PromptHelper:
     """
 
     user_system = platform.uname()
+    current_time = datetime.now().strftime("%d-%m-%y %H:%M:%S")
 
     @staticmethod
     def shell_helper(user_input: str) -> str:
@@ -41,7 +43,8 @@ class PromptHelper:
         """
         return f"""
         Analyze the output of the following command: {command}  
-        Summarize key details, highlighting errors, warnings, and important findings.  
+        Summarize key details, highlighting errors, warnings, and important findings.
+        Current system time for reference: {PromptHelper.current_time}
         Output: {output}  
         """
 
