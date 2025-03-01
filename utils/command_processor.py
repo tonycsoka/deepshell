@@ -1,6 +1,7 @@
 import os
 import re
 from utils.logger import Logger
+from config.settings import Mode
 from utils.file_utils import FileUtils
 from utils.shell_utils import CommandExecutor
 
@@ -24,19 +25,43 @@ class CommandProcessor:
             bypass_flag = True
             return user_input, bypass_flag
 
+        if user_input.startswith("@"):  # Handle @mode command
+            user_input = self.detect_mode(user_input)
+            if user_input is None:
+                return None
+
         if user_input:
             target, additional_action = await self.detect_action(user_input)
             if target:
                 await self.file_utils.process_file_or_folder(target)
+                
                 if additional_action:
                     user_input = additional_action
-                   
+                
                 return user_input
             else:
                 if additional_action == "cancel":
                     return None
 
         return user_input
+
+
+    def detect_mode(self, user_input):
+        """Detects if input starts with @ and checks if it matches a Mode."""
+        mode_switcher = self.manager.client.switch_mode
+        parts = user_input.split(" ", 1)  # Split at the first space
+        if len(parts) < 2:
+            return None  # No valid input after mode
+        
+        mode_str, after_text = parts[0][1:].upper(), parts[1]
+        
+        try:
+            mode = Mode[mode_str]  # Check if the mode exists 
+            mode_switcher(mode)
+            return after_text  # Return the remaining part as user input
+        except KeyError:
+            print("Invalid mode detected")
+            return None
 
    
     async def detect_action(self, user_input):

@@ -36,6 +36,8 @@ class ChatManager:
         Deploys a task based on user input and file content.
         """
         logger.info("Deploy task started.")
+        response = None
+        current_mode = self.client.mode
         
         if file_name:
             logger.info("Processing file: %s", file_name)
@@ -56,20 +58,24 @@ class ChatManager:
 
         user_input, bypass_flag = (user_input if isinstance(user_input, tuple) else (user_input, False))
           
-        
         logger.info("Executing task manager.")
 
         if bypass_flag or self.client.mode != Mode.DEFAULT:
 
-            return await self.task_manager(user_input = user_input,bypass = bypass_flag)
+            response = await self.task_manager(user_input = user_input,bypass = bypass_flag)
         
         if self.client.keep_history and self.client.mode != Mode.SHELL:
             history = await self.generate_prompt(user_input)
             response = await self.task_manager(history=history)
+
+        if self.client.keep_history and response:
             await self.add_to_history("assistant", response)
-            return response
-        
+
+        if self.client.mode != current_mode:
+            self.client.switch_mode(current_mode)
+
         logger.info("Deploy task completed.")
+        return response
 
 
     async def task_manager(self, user_input = None, history = None, bypass = False):
@@ -113,7 +119,7 @@ class ChatManager:
             
             output = PromptHelper.analyzer_helper(input, output)
            
-            await self._handle_default_mode(output)
+            return await self._handle_default_mode(output)
         else:
             logger.warning("No output detected.")
             if self.ui:

@@ -126,7 +126,7 @@ class ChatMode(App):
         
         if is_password:
             self.input_widget.password = False
-            self.input_widget.placeholder = "Type here and press Enter:..."
+        self.input_widget.placeholder = "Type here and press Enter:..."
 
         return user_input
 

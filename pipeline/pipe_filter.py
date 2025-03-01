@@ -11,7 +11,6 @@ class PipeFilter:
         self.input_buffer = ollama_client.output_buffer  
         self.buffer = asyncio.Queue()
         self.formatting = ollama_client.render_output
-        self.shell = True if ollama_client.mode == Mode.SHELL else False
         self.extracted_code = None
 
     async def process_stream(self,extract_code = False):
@@ -118,7 +117,7 @@ class PipeFilter:
         """
         pattern = r'```(\w+)?\n(.*?)```'
 
-        if self.shell:
+        if self.ollama_client.mode == Mode.SHELL:
             # Match the first shell snippet (either `sh` or `bash`)
             shell_pattern = r'```(?:sh|bash)\n(.*?)```'
             match = re.search(shell_pattern, response, re.DOTALL)
