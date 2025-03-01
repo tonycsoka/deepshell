@@ -13,7 +13,7 @@ class Mode(Enum):
 # Settings
 DEFAULT_HOST = "http://localhost:11434"
 
-DEFAULT_MODEL = "deepseek-r1:14b"
+DEFAULT_MODEL = "deepseek-r1:7b"
 CODE_MODEL = "deepseek-coder-v2:16b"
 SHELL_MODEL = "deepseek-coder-v2:16b"
 SYSTEM_MODEL = "deepseek-r1:7b"

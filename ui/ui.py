@@ -108,7 +108,7 @@ class ChatMode(App):
         """Waits for user input asynchronously and returns the value.
         If is_password is True, masks the input like a password.
         """
-        await self.fancy_print(f"\n[cyan]System:[/cyan] {prompt_text}")
+        await self.fancy_print(f"\n[cyan]System:[/cyan] {prompt_text}\n")
     
               
         self.input_widget.value = input_text  # Set initial text
@@ -144,8 +144,8 @@ class ChatMode(App):
 
         prompt_text = (
         f"{prompt_text}\n"
-        "[green]Yes[/green] or [red]No[/red]?\n"
-        f"Press [blue]Enter[/blue] for a quick [{color}]{default}[/{color}]\n"
+        "[green]Yes[/green] or [red]No[/red]\n"
+        f"[blue]Enter[/blue] for a quick [{color}]{default}[/{color}]"
         )
         
         while True:

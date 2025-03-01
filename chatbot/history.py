@@ -3,6 +3,7 @@ import re
 import asyncio
 import aiofiles
 import numpy as np
+from datetime import datetime
 from utils.logger import Logger
 from config.settings import Mode
 from chatbot.helper import PromptHelper
@@ -16,30 +17,45 @@ logger = Logger.get_logger()
 helper, filter_helper = ChatBotDeployer.deploy_chatbot(Mode.HELPER)
 
 class Project:
-    def __init__(self,name = "") -> None:
+    def __init__(self, name="") -> None:
         self.name = name
         self.file_embeddings: dict[str, dict] = {}
         self.folder_structure: dict = {}
 
-    def _index_file(self, file_path: str,content, embedding):
+    def _index_content(self, identifier: str, content: str, embedding, content_type: str = "file"):
         """
-        Internal method to add a file's embedding (along with file name and path) to the topic.
-        
+        Generic method to index any content (files or terminal outputs).
+
         Args:
-            file_path (str): The file's path.
-            content (str): The file content.
-            embedding (np.ndarray): Pre-computed embedding of the content.
+            identifier (str): Unique identifier (e.g., file path or generated key).
+            content (str): The content to index.
+            embedding (np.ndarray): The computed embedding.
+            content_type (str): Type of the content ("file" or "terminal").
         """
-        file_name = os.path.basename(file_path)
-        file_info = {
-            "file_name": file_name,
-            "full_path": file_path,
+        content_info = {
+            "identifier": identifier,
             "content": content,
-            "embedding": embedding
+            "embedding": embedding,
+            "type": content_type
         }
-       
-        self.file_embeddings[file_path] = file_info
-        logger.debug(f"Project '{self.name}': Added file {file_path}")
+        self.file_embeddings[identifier] = content_info
+        logger.debug(f"Project '{self.name}': Added {content_type} content with id {identifier}")
+
+    def _index_file(self, file_path: str, content: str, embedding):
+        """
+        Indexes a file's embedding, wrapping the file path as the unique identifier.
+        """
+        self._index_content(file_path, content, embedding, content_type="file")
+
+    def _index_terminal_output(self, output: str, identifier: str, embedding):
+        """
+        Indexes terminal code blocks or output, generating a unique identifier if not provided.
+        """
+        if not identifier:
+            # Generate a unique identifier, e.g., using a timestamp.
+            identifier = f"terminal_{datetime.now().isoformat()}"
+        self._index_content(identifier, output, embedding, content_type="terminal")
+
 
     async def _read_file(self, file_path: str) -> tuple[str, str]:
         """
@@ -146,9 +162,8 @@ class HistoryManager:
 
         await self.current_topic.add_message(role, message,embedding)
         asyncio.create_task(self._analyze_history())
-
-
-   
+ 
+    
     async def add_file(self, file_path: str, content: str) -> None:
         """
         Adds a file by computing its combined embedding (file path + content) 
@@ -175,9 +190,34 @@ class HistoryManager:
             
             self.current_project = new_project
 
+        # Compute embedding for file path + content
         combined_content = f"Path: {file_path}\nContent: {content}"
         file_embedding = await self.fetch_embedding(combined_content)
-        self.current_project._index_file(file_path, content, file_embedding)
+        
+        # Store the file in the project using a universal indexing method
+        self.current_project._index_content(file_path, content, file_embedding, content_type="file")
+
+    async def add_terminal_output(self, command: str, output: str, summary: str) -> None:
+        """
+        Adds a terminal output by computing its embedding and indexing it 
+        within the current project. 
+        
+        Args:
+            command (str): The executed command.
+            output (str): The raw output of the command.
+            summary (str): A summarized explanation of the output.
+        """
+        terminal_content = f"Command: {command}\nOutput: {output}\nSummary: {summary}"
+        terminal_embedding = await self.fetch_embedding(terminal_content)
+
+        # Generate a unique identifier for terminal output storage
+        terminal_id = f"terminal_{hash(command + datetime.now().isoformat())}"
+        
+        # Store the terminal output using the unified indexing method
+        self.current_project._index_content(terminal_id, terminal_content, terminal_embedding, content_type="terminal")
+        
+        logger.info(f"Stored terminal output for command: {command}")
+    
 
     def add_folder_structure(self, structure) -> None:
         """
@@ -249,52 +289,68 @@ class HistoryManager:
         return None
 
     
-    async def get_relevant_files(self, query: str, top_k: int = 1, similarity_threshold: float = 0.6):
+    
+    async def get_relevant_content(self, query: str, content_type = None, top_k: int = 1, similarity_threshold: float = 0.6):
         """
-        Retrieves relevant files by comparing the query against the indexed file embeddings.
-        The indexed file info includes file name, full path, content, and embedding.
+        Retrieves relevant content (files or terminal outputs) by comparing the query
+        against the stored embeddings.
         
-        For file queries, first try an exact file name match, then fallback to cosine similarity.
+        Args:
+            query (str): The user query.
+            content_type (str, optional): Type of content to filter by (e.g., "file" or "terminal").
+            top_k (int): Maximum number of results.
+            similarity_threshold (float): Minimum similarity score to consider.
+        
+        Returns:
+            list: A list of tuples (identifier, content) for the top matching entries.
         """
         query_embedding = await self.fetch_embedding(query)
-        file_scores = []
-        
-        file_name = self.extract_file_name_from_query(query)
-        if file_name:
-            for file_path, file_info in self.current_project.file_embeddings.items():
-                if file_name.lower() in file_info["file_name"].lower():
-                    file_scores.append((file_path, 1.0))
-            
-            # If no exact match, fallback to cosine similarity using the stored embedding.
-            if not file_scores:
-                for file_path, file_info in self.current_project.file_embeddings.items():
-                    similarity = cosine_similarity([query_embedding], [file_info["embedding"]])[0][0]
-                    if similarity >= similarity_threshold:
-                        file_scores.append((file_path, similarity))
-        
-        if not file_scores:
-            logger.info("No relevant files found in the current topic, expanding search across all topics.")
-            all_file_embeddings = {}
+        scores = []
+
+        # Optionally extract a file name only if querying for files.
+        file_name = self.extract_file_name_from_query(query) if content_type in (None, "file") else None
+
+        # Iterate over all stored content
+        for identifier, info in self.current_project.file_embeddings.items():
+            # Filter by type if specified
+            if content_type and info.get("type") != content_type:
+                continue
+
+            # If querying a file, try an exact match on identifier if available.
+            if file_name and info.get("type") == "file":
+                if file_name.lower() in info.get("identifier", "").lower():
+                    scores.append((identifier, 1.0))
+                    continue
+
+            similarity = cosine_similarity([query_embedding], [info["embedding"]])[0][0]
+            if similarity >= similarity_threshold:
+                scores.append((identifier, similarity))
+
+        # Expand search to other projects if necessary (similar to your current logic)
+        if not scores:
+            logger.info("No relevant content in the current project; searching across all projects.")
             for project in self.projects:
-                all_file_embeddings.update(project.file_embeddings)
-            for file_path, file_info in all_file_embeddings.items():
-                similarity = cosine_similarity([query_embedding], [file_info["embedding"]])[0][0]
-                if similarity >= similarity_threshold:
-                    file_scores.append((file_path, similarity))
-        
-        if file_scores:
-            file_scores.sort(key=lambda x: x[1], reverse=True)
-            selected_file_paths = [fp for fp, _ in file_scores[:top_k]]
+                for identifier, info in project.file_embeddings.items():
+                    if content_type and info.get("type") != content_type:
+                        continue
+                    similarity = cosine_similarity([query_embedding], [info["embedding"]])[0][0]
+                    if similarity >= similarity_threshold:
+                        scores.append((identifier, similarity))
+
+        if scores:
+            scores.sort(key=lambda x: x[1], reverse=True)
+            selected_ids = [id for id, _ in scores[:top_k]]
             results = []
-            for fp in selected_file_paths:
-                if fp in self.current_project.file_embeddings and "content" in self.current_project.file_embeddings[fp]:
-                    results.append((fp, self.current_project.file_embeddings[fp]["content"]))
+            for id in selected_ids:
+                # Try to retrieve the content from the current project first.
+                if id in self.current_project.file_embeddings and "content" in self.current_project.file_embeddings[id]:
+                    results.append((id, self.current_project.file_embeddings[id]["content"]))
                 else:
-                    file_path, content = await self.current_project._read_file(fp)
-                    results.append((fp, content))
+                    file_path, content = await self.current_project._read_file(id)
+                    results.append((id, content))
             return results
 
-        logger.info("No matching file embeddings found")
+        logger.info("No matching content found")
         return None
 
 
@@ -367,11 +423,12 @@ class HistoryManager:
         
 
     
+    
     async def generate_prompt(self, query, num_messages=5):
         """
-        Generates a prompt by retrieving context and file references from the best matching topic.
-        If the query references a folder, the corresponding folder structure is retrieved and assigned
-        to the current topic before being included in the prompt.
+        Generates a prompt by retrieving context and content references (files, terminal outputs, etc.)
+        from the best matching topic. If the query references a folder, the corresponding folder structure
+        is retrieved and assigned to the current topic before being included in the prompt.
 
         Args:
             query (str): The user query.
@@ -381,7 +438,7 @@ class HistoryManager:
         """
         embedding = await self.fetch_embedding(query)
         
-        # Determine the best matching topic and switch to it if found
+        # Determine the best matching topic and switch to it if found.
         current_topic = await self._match_topic(embedding)
         if current_topic:
             await self.switch_topic(current_topic)
@@ -391,22 +448,34 @@ class HistoryManager:
         if project:
             self.current_project = project
 
-        relevant_files = await self.get_relevant_files(query)
-        file_references = ""
+        # Retrieve all types of content unless a filter is specified.
+        relevant_content = await self.get_relevant_content(query)
+        content_references = ""
         
-        if relevant_files:
+        if relevant_content:
             if self.current_project.folder_structure:
-                file_references += f"Folder structure:\n{self.format_structure(self.current_project.folder_structure)}\n"
-
-            for file_path, content in relevant_files:
-                file_references += f"\n[Referenced File: {file_path}]\n{content}\n..."
+                content_references += (
+                    f"Folder structure:\n{self.format_structure(self.current_project.folder_structure)}\n"
+                )
+            # Iterate through each retrieved content item.
+            for identifier, content in relevant_content:
+                # Attempt to determine the content type (default to generic "Content").
+                content_type = self.current_project.file_embeddings.get(identifier, {}).get("type", "content")
+                if content_type == "file":
+                    label = "Referenced File"
+                elif content_type == "terminal":
+                    label = "Referenced Terminal Output"
+                else:
+                    label = "Referenced Content"
+                content_references += f"\n[{label}: {identifier}]\n{content}\n..."
         
-        prompt = f"{query}\n\n{file_references}" if file_references else query
+        prompt = f"{query}\n\n{content_references}" if content_references else query
         
         logger.info(f"Generated prompt: {prompt}")
         await self.add_message("user", prompt, embedding)
         
         return self.current_topic.history[-num_messages:]
+
 
 
     async def generate_topic_info_from_history(self,history, max_retries: int = 3):

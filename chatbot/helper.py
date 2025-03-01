@@ -10,7 +10,7 @@ class PromptHelper:
     """
 
     user_system = platform.uname()
-    current_time = datetime.now().strftime("%d-%m-%y %H:%M:%S")
+    current_time = datetime.now().isoformat()
 
     @staticmethod
     def shell_helper(user_input: str) -> str:
@@ -42,10 +42,12 @@ class PromptHelper:
             str: A formatted prompt instructing the model to analyze and summarize key details.
         """
         return f"""
-        Analyze the output of the following command: {command}  
+        Analyze the output of the following command: {command}
+        Output: {output}  
+
+
         Summarize key details, highlighting errors, warnings, and important findings.
         Current system time for reference: {PromptHelper.current_time}
-        Output: {output}  
         """
 
     @staticmethod

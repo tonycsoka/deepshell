@@ -18,13 +18,15 @@ class ChatManager:
     def __init__(self):
         self.client, self.filtering = ChatBotDeployer.deploy_chatbot() 
         self.ui = ChatMode(self) if self.client.render_output else None
-        
+        self.last_mode = None
+                
         self.command_processor = CommandProcessor(self)
         self.file_utils = self.command_processor.file_utils
         self.executor = self.command_processor.executor
 
         self.history_manager = HistoryManager(self)
-        self.add_to_history = self.history_manager.add_message 
+        self.add_to_history = self.history_manager.add_message
+        self.add_terminal_output = self.history_manager.add_terminal_output
         self.generate_prompt = self.history_manager.generate_prompt
 
         self.file_utils.set_index_functions(self.history_manager.add_file,self.history_manager.add_folder_structure)
@@ -37,7 +39,7 @@ class ChatManager:
         """
         logger.info("Deploy task started.")
         response = None
-        current_mode = self.client.mode
+        self.last_mode = self.client.mode
         
         if file_name:
             logger.info("Processing file: %s", file_name)
@@ -64,15 +66,15 @@ class ChatManager:
 
             response = await self.task_manager(user_input = user_input,bypass = bypass_flag)
         
-        if self.client.keep_history and self.client.mode != Mode.SHELL:
+        if self.client.keep_history and self.client.mode != Mode.SHELL and not response:
             history = await self.generate_prompt(user_input)
             response = await self.task_manager(history=history)
 
         if self.client.keep_history and response:
             await self.add_to_history("assistant", response)
 
-        if self.client.mode != current_mode:
-            self.client.switch_mode(current_mode)
+        if self.client.mode != self.last_mode:
+            self.client.switch_mode(self.last_mode)
 
         logger.info("Deploy task completed.")
         return response
@@ -105,6 +107,7 @@ class ChatManager:
         Handles tasks when the client is in SHELL mode.
         """
         logger.info("Shell mode execution started. Bypass: %s", bypass)
+        print_output = None
         
         if not bypass:
             input = await self._handle_code_mode(PromptHelper.shell_helper(input), no_render=True)
@@ -112,14 +115,31 @@ class ChatManager:
         else:
             output = await self.executor.execute_command(input)
         
-        if output:
+        if output and input:
             logger.info("Command executed, processing output.")
-            if self.ui and await self.ui.yes_no_prompt("Do you want to see the output?", default="No"):
-                await self.ui.buffer.put(output)
+            if self.ui:
+                await self.ui.fancy_print(f"\n[cyan]System:[/] Executing [green]'{input}'[/]\n")
+                if await self.ui.yes_no_prompt("Do you want to see the output?", default="No"):
+                    print_output = asyncio.create_task(self.ui.fancy_print(
+                    f"""
+                    \n[blue]Output[/]:
+                    {output}\n
+                    [cyan]System:[/]
+                    awaiting output analysis...
+                    """))
+                await self.ui.fancy_print("\n[cyan]System:[/] Output submitted to the chatbot for analysis...")
             
-            output = PromptHelper.analyzer_helper(input, output)
-           
-            return await self._handle_default_mode(output)
+            prompt = PromptHelper.analyzer_helper(input, output)
+            self.client.switch_mode(Mode.SYSTEM)
+            summary = asyncio.create_task(self._handle_default_mode(prompt))
+            if print_output:
+                await asyncio.gather(print_output,summary)
+            else:
+                await summary
+            summary = self.client.last_response 
+            if self.client.keep_history and summary:
+                await self.add_terminal_output(input,output,summary)
+            return summary
         else:
             logger.warning("No output detected.")
             if self.ui:
@@ -134,21 +154,27 @@ class ChatManager:
         """
         Handles tasks when the client is in CODE mode.
         """
+        code = None
         logger.info("Code mode execution started.")
-        
-        get_stream = asyncio.create_task(self.client._chat_stream(input))
-        process_text = asyncio.create_task(self.filtering.process_stream(True))
-        self.tasks = [get_stream, process_text]
-        await asyncio.gather(*self.tasks)
-        
-        code = self.filtering.extracted_code
-        if self.ui and not no_render:
-            await self.ui.fancy_print(code)
-        
-        self.tasks = []
-        
-        logger.info("Code mode execution completed.")
+        if self.client.mode == Mode.CODE:
+            get_stream = asyncio.create_task(self.client._chat_stream(input))
+            process_text = asyncio.create_task(self.filtering.process_stream(True))
+            self.tasks = [get_stream, process_text]
+            await asyncio.gather(*self.tasks)
+            
+            code = self.filtering.extracted_code
+            if self.ui and not no_render:
+                await self.ui.fancy_print(code)
+            
+            self.tasks = []
+            
+            logger.info("Code mode execution completed.")
+        #extracting shell command
+        elif self.client.mode == Mode.SHELL:
+            response = await self.client._fetch_response(input)
+            code = await self.filtering.process_static(response,True)
 
+        
         return code
 
     async def _handle_default_mode(self, input= None, history = None, no_render=False):

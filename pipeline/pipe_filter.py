@@ -88,9 +88,8 @@ class PipeFilter:
             self.extracted_code = await self.extract_code(response=text)
 
             if self.extracted_code:
-                await self.buffer.put(self.extracted_code)
-            logger.debug(f"Extracted code: {self.extracted_code}")
-            return self.extracted_code
+                logger.debug(f"Extracted code: {self.extracted_code}")
+                return self.extracted_code
 
         # Process thoughts and filter them
         thoughts = re.findall(r"<think>(.*?)</think>", text, flags=re.DOTALL)
@@ -98,9 +97,7 @@ class PipeFilter:
 
         self.ollama_client.last_response = filtered_text
         self.ollama_client.thoughts.append(thoughts)
-        
-        await self.buffer.put(filtered_text)
-        await self.buffer.put(None)
+         
 
         logger.debug(f"Filtered text: {filtered_text} \nThoughts: {thoughts}")
         return filtered_text

@@ -20,13 +20,13 @@ class CommandProcessor:
         """Processes commands, handles file/folder operations, and updates config."""
         bypass_flag = False
 
-        if user_input.startswith("!"):
+        if user_input.startswith("!"): #Handle shell bypass
             user_input = user_input[1:] 
             bypass_flag = True
             return user_input, bypass_flag
 
         if user_input.startswith("@"):  # Handle @mode command
-            user_input = self.detect_mode(user_input)
+            user_input = await self.detect_mode(user_input)
             if user_input is None:
                 return None
 
@@ -46,28 +46,33 @@ class CommandProcessor:
         return user_input
 
 
-    def detect_mode(self, user_input):
+    async def detect_mode(self, user_input):
         """Detects if input starts with @ and checks if it matches a Mode."""
         mode_switcher = self.manager.client.switch_mode
-        parts = user_input.split(" ", 1)  # Split at the first space
+        parts = user_input.split(" ", 1)
         if len(parts) < 2:
-            return None  # No valid input after mode
+            if self.ui:
+                await self.ui.fancy_print("\n\n[red]System:[/]\nNo user prompt detected after mode override\n")
+            logger.warning("No user prompt detected after user override")
+            return None
         
         mode_str, after_text = parts[0][1:].upper(), parts[1]
         
         try:
-            mode = Mode[mode_str]  # Check if the mode exists 
+            mode = Mode[mode_str] 
             mode_switcher(mode)
-            return after_text  # Return the remaining part as user input
+            logger.info(f"Mode detected: {mode.name}")
+            return after_text
         except KeyError:
-            print("Invalid mode detected")
+            if self.ui:
+                await self.ui.fancy_print("\n\n[red]System:[/]\nInvalid mode override\n")
+            logger.warning("Invalid mode override, suspending input")
             return None
 
    
     async def detect_action(self, user_input):
         """Detects action, validates/finds target, and processes file/folder."""
 
-        # Extract action and target
         parts = re.split(r"\band\b", user_input, maxsplit=1)
         main_command = parts[0].strip()
         additional_action = parts[1].strip() if len(parts) > 1 else None
