@@ -31,7 +31,7 @@ Ensure the deepseek is within your grasp:
 chmod +x intall_ollama.sh
 sh install_ollama.sh
 ```
-This shall intall ollama and pull the required models from /config/settings.py
+This shall intall ollama and pull the required models from `/config/settings.py`
 If one is not plannigng to use vision model, empty the `VISION_MODEL = ""` string, to avoid downloading.
 
 For those who prefer the traditional way:
