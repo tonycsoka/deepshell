@@ -86,7 +86,7 @@ class ChatMode(App):
                     self.exit_app()
                 else:
                   
-                    await self.fancy_print(f"\n\n[bold red]You: [/bold red]{text}")
+                    await self.fancy_print(f"\n\n[bold red]You: [/bold red]{text}\n")
                     self.input_widget.clear()
                     self.input_widget.focus()
                     asyncio.create_task(self.manager.deploy_task(text))
@@ -144,7 +144,7 @@ class ChatMode(App):
 
         prompt_text = (
         f"{prompt_text}\n"
-        "[green]Yes[/green] or [red]No[/red]\n"
+        "\n[green]Yes[/green] or [red]No[/red]\n"
         f"[blue]Enter[/blue] for a quick [{color}]{default}[/{color}]"
         )
         

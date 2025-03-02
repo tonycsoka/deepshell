@@ -368,7 +368,7 @@ class CommandExecutor:
         command = command.lstrip()
 
         command = await self._get_user_input(
-            'Validate the command and press Enter.\n(Delete and press Enter to cancel): ',
+            'Validate the command and press [blue]Enter[/].\nOr delete the text and press [blue]Enter[/] to cancel',
             input_text=command
         )
         
