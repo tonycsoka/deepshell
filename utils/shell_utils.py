@@ -3,6 +3,7 @@ import string
 import asyncio
 import secrets
 from utils.logger import Logger
+from config.settings import MONITOR_INTERVAL, MAX_OUTPUT_LINES, OUTPUT_VALIDATION
 
 logger = Logger.get_logger()
 
@@ -12,7 +13,7 @@ class CommandExecutor:
     monitoring execution, and processing command outputs.
     """
 
-    def __init__(self, ui=None, monitor_interval=60, max_output_lines=300, output_validation=True):
+    def __init__(self, ui=None):
         """
         Initializes the CommandExecutor.
         
@@ -25,9 +26,9 @@ class CommandExecutor:
         self.ui = ui
         self._should_stop = False
         self.sudo_password = None
-        self.monitor_interval = monitor_interval
-        self.max_output_lines = max_output_lines
-        self.output_validation = output_validation
+        self.monitor_interval = MONITOR_INTERVAL
+        self.max_output_lines = MAX_OUTPUT_LINES
+        self.output_validation = OUTPUT_VALIDATION
         if self.ui:
             self.sudo_password = self.ui.pswd
  

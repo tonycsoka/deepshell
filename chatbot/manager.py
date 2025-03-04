@@ -118,17 +118,13 @@ class ChatManager:
         if output and input:
             logger.info("Command executed, processing output.")
             if self.ui:
+                system_message = "\n[cyan]System:[/] Output submitted to the chatbot for analysis..."         
+
                 await self.ui.fancy_print(f"\n[cyan]System:[/] Executing [green]'{input}'[/]\n")
+               
                 if await self.ui.yes_no_prompt("Do you want to see the output?", default="No"):
-                    print_output = asyncio.create_task(self.ui.fancy_print(
-                    f"""
-                    \n[blue]Output[/]:
-                    {output}\n
-                    [cyan]System:[/]
-                    awaiting output analysis...
-                    """))
-                await self.ui.fancy_print("\n[cyan]System:[/] Output submitted to the chatbot for analysis...")
-            
+                    print_output = asyncio.create_task(self.ui.fancy_print(f"\n[blue]Output[/]:\n{output}\n{system_message}"))
+                            
             prompt = PromptHelper.analyzer_helper(input, output)
             self.client.switch_mode(Mode.SYSTEM)
             summary = asyncio.create_task(self._handle_default_mode(prompt))

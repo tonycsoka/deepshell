@@ -36,9 +36,13 @@ MODE_CONFIGS = {
 LOGGING = True
 LOGGING_LEVEL = "info"
 
+#ShellUtils Config 
+MONITOR_INTERVAL = 60
+MAX_OUTPUT_LINES = 600
+OUTPUT_VALIDATION = True
+
 #FileProcessing Config 
 PROCESS_IMAGES = False
-
 
 #Processing large text files
 
