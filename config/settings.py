@@ -51,6 +51,7 @@ OUTPUT_VALIDATION = True
 
 #FileProcessing Config 
 PROCESS_IMAGES = False #Turn this on if you want to get a description of the images
+IMG_INPUT_RES = (672, 672)
 
 MAX_FILE_SIZE = 3 * 1024 * 1024 #3MB
 MAX_LINES = 600

@@ -9,7 +9,7 @@ from utils.logger import Logger
 from config.settings import Mode
 from ui.popups import RadiolistPopup
 from chatbot.deployer import ChatBotDeployer
-from config.settings import SUPPORTED_EXTENSIONS, IGNORED_FOLDERS, MAX_FILE_SIZE, MAX_LINES, CHUNK_SIZE, PROCESS_IMAGES
+from config.settings import SUPPORTED_EXTENSIONS, IGNORED_FOLDERS, MAX_FILE_SIZE, MAX_LINES, CHUNK_SIZE, PROCESS_IMAGES, IMG_INPUT_RES
 
 logger = Logger.get_logger()
 
@@ -137,7 +137,7 @@ class FileUtils:
         try:
             def resize_and_encode():
                 with Image.open(file_path) as img:
-                    img.thumbnail((1120, 1120))
+                    img.thumbnail(IMG_INPUT_RES)
                     buffer = BytesIO()
                     img.save(buffer, format="PNG")
                     return base64.b64encode(buffer.getvalue()).decode('utf-8')
