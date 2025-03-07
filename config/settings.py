@@ -10,7 +10,7 @@ class Mode(Enum):
     HELPER = auto ()
     VISION = auto()
 
-# Settings
+# Ollama Settings
 DEFAULT_HOST = "http://localhost:11434"
 
 DEFAULT_MODEL = "deepseek-r1:7b"
@@ -36,15 +36,21 @@ MODE_CONFIGS = {
 LOGGING = True
 LOGGING_LEVEL = "info"
 
+#HistoryManager
+MSG_THR = 0.5 # Simularity threshold for history
+CONT_THR = 0.6 # Simularity threshold for content such as files and terminal output
+NUM_MSG = 5 # Number of messages submitted to the chatbot from history
+OFF_THR = 0.7 # Off-topic threshold
+OFF_FREQ = 4 # Off-topic checking frequency  (messages)
+SLICE_SIZE = 4 # Last N messages to analyze for off-topic 
+
 #ShellUtils Config 
-MONITOR_INTERVAL = 60
+MONITOR_INTERVAL = 60 # Timeout until when user will be prompted to abort the execution
 MAX_OUTPUT_LINES = 600
 OUTPUT_VALIDATION = True
 
 #FileProcessing Config 
-PROCESS_IMAGES = False
-
-#Processing large text files
+PROCESS_IMAGES = False #Turn this on if you want to get a description of the images
 
 MAX_FILE_SIZE = 3 * 1024 * 1024 #3MB
 MAX_LINES = 600
@@ -67,5 +73,3 @@ SUPPORTED_EXTENSIONS = [
 ]
 
 IGNORED_FOLDERS =  ['__pycache__', '.git', '.svn', '.hg', 'Android', 'android-studio', 'miniconda3']
-
-

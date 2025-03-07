@@ -169,7 +169,6 @@ class ChatManager:
         elif self.client.mode == Mode.SHELL:
             response = await self.client._fetch_response(input)
             code = await self.filtering.process_static(response,True)
-
         
         return code
 

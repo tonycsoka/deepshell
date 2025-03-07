@@ -86,7 +86,7 @@ class ChatMode(App):
                     self.exit_app()
                 else:
                   
-                    await self.fancy_print(f"\n\n[bold red]You: [/bold red]{text}\n")
+                    await self.fancy_print(f"\n\n[bold red]You: [/bold red]{text}")
                     self.input_widget.clear()
                     self.input_widget.focus()
                     asyncio.create_task(self.manager.deploy_task(text))

@@ -5,11 +5,12 @@ import aiofiles
 import numpy as np
 from datetime import datetime
 from utils.logger import Logger
-from config.settings import Mode
+from config.settings import OFF_THR, Mode
 from chatbot.helper import PromptHelper
 from chatbot.deployer import ChatBotDeployer
 from ollama_client.api_client import OllamaClient
 from sklearn.metrics.pairwise import cosine_similarity
+from config.settings import MSG_THR,CONT_THR,NUM_MSG,OFF_FREQ,SLICE_SIZE 
 
 
 logger = Logger.get_logger()
@@ -17,6 +18,7 @@ logger = Logger.get_logger()
 helper, filter_helper = ChatBotDeployer.deploy_chatbot(Mode.HELPER)
 
 class Project:
+
     def __init__(self, name="") -> None:
         self.name = name
         self.file_embeddings: dict[str, dict] = {}
@@ -56,7 +58,6 @@ class Project:
             identifier = f"terminal_{datetime.now().isoformat()}"
         self._index_content(identifier, output, embedding, content_type="terminal")
 
-
     async def _read_file(self, file_path: str) -> tuple[str, str]:
         """
         Asynchronously reads a file.
@@ -77,6 +78,7 @@ class Project:
 
 
 class Topic:
+
     def __init__(self, name="", description="") -> None:
         """
         Initializes a Topic with a name and description.
@@ -126,7 +128,8 @@ class Topic:
 
  
 class HistoryManager:
-    def __init__(self,manager, top_k: int = 2, similarity_threshold: float = 0.5) -> None:
+
+    def __init__(self, manager) -> None:
         """
         Initializes HistoryManager to handle topics and off-topic tracking.
         An "unsorted" topic collects messages and files until a clear topic emerges.
@@ -136,15 +139,13 @@ class HistoryManager:
             similarity_threshold (float): Threshold for determining similarity.
         """
         self.file_utils = manager.file_utils
-        self.top_k = top_k
-        self.similarity_threshold = similarity_threshold
+        self.similarity_threshold = MSG_THR
         self.topics: list[Topic] = []
         self.current_topic = Topic()
         self.embedding_cache: dict[str, np.ndarray] = {}
         self.projects: list[Project] = []
         self.current_project = Project("Unsorted")
     
-
     async def add_message(self, role, message,embedding = None) -> None:
         """
         Routes a new message to the best-matching topic.
@@ -163,7 +164,6 @@ class HistoryManager:
         await self.current_topic.add_message(role, message,embedding)
         asyncio.create_task(self._analyze_history())
  
-    
     async def add_file(self, file_path: str, content: str) -> None:
         """
         Adds a file by computing its combined embedding (file path + content) 
@@ -217,7 +217,6 @@ class HistoryManager:
         self.current_project._index_content(terminal_id, terminal_content, terminal_embedding, content_type="terminal")
         
         logger.info(f"Stored terminal output for command: {command}")
-    
 
     def add_folder_structure(self, structure) -> None:
         """
@@ -287,10 +286,8 @@ class HistoryManager:
             if not re.search(r"\.[a-zA-Z0-9]+$", candidate):
                 return candidate
         return None
-
-    
-    
-    async def get_relevant_content(self, query: str, content_type = None, top_k: int = 1, similarity_threshold: float = 0.6):
+ 
+    async def get_relevant_content(self, query: str, content_type = None, top_k: int = 1, similarity_threshold: float = CONT_THR):
         """
         Retrieves relevant content (files or terminal outputs) by comparing the query
         against the stored embeddings.
@@ -353,7 +350,6 @@ class HistoryManager:
         logger.info("No matching content found")
         return None
 
-
     async def fetch_embedding(self, text: str) -> np.ndarray: 
         """
         Asynchronously fetches and caches an embedding for the given text.
@@ -371,7 +367,6 @@ class HistoryManager:
         else:
             return np.array([])
        
-    
     async def switch_topic(self,topic):
         async with asyncio.Lock():
             if topic.name != self.current_topic.name:
@@ -380,7 +375,6 @@ class HistoryManager:
                 logger.info(f"Switched to {topic.name}")
                 self.current_topic = topic
 
-    
     async def _match_topic(self, embedding, exclude_topic: Topic | None = None) -> Topic | None:
         """
         Matches a message or file embedding to the most similar topic based on the description embedding,
@@ -420,11 +414,8 @@ class HistoryManager:
         else:
             logger.info("No suitable topic found.")
             return None
-        
-
     
-    
-    async def generate_prompt(self, query, num_messages=5):
+    async def generate_prompt(self, query, num_messages=NUM_MSG):
         """
         Generates a prompt by retrieving context and content references (files, terminal outputs, etc.)
         from the best matching topic. If the query references a folder, the corresponding folder structure
@@ -476,8 +467,6 @@ class HistoryManager:
         
         return self.current_topic.history[-num_messages:]
 
-
-
     async def generate_topic_info_from_history(self,history, max_retries: int = 3):
         """
         Attempts to extract a topic name and description from the given history.
@@ -526,12 +515,11 @@ class HistoryManager:
                     break
         return None, None
 
-    
     async def _analyze_history(
         self,
-        off_topic_threshold: float = 0.7,
-        off_topic_frequency: int = 4,
-        slice_size: int = 4
+        off_topic_threshold: float = OFF_THR,
+        off_topic_frequency: int = OFF_FREQ,
+        slice_size: int = SLICE_SIZE
     ) -> None:
         """
         Analyzes the current topic's history for potential off-topic drift.
