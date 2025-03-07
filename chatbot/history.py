@@ -5,12 +5,11 @@ import aiofiles
 import numpy as np
 from datetime import datetime
 from utils.logger import Logger
-from config.settings import OFF_THR, Mode
 from chatbot.helper import PromptHelper
 from chatbot.deployer import ChatBotDeployer
 from ollama_client.api_client import OllamaClient
 from sklearn.metrics.pairwise import cosine_similarity
-from config.settings import MSG_THR,CONT_THR,NUM_MSG,OFF_FREQ,SLICE_SIZE 
+from config.settings import Mode, OFF_THR, MSG_THR, CONT_THR, NUM_MSG, OFF_FREQ, SLICE_SIZE 
 
 
 logger = Logger.get_logger()
@@ -139,6 +138,7 @@ class HistoryManager:
             similarity_threshold (float): Threshold for determining similarity.
         """
         self.file_utils = manager.file_utils
+        self.ui = manager.ui
         self.similarity_threshold = MSG_THR
         self.topics: list[Topic] = []
         self.current_topic = Topic()
@@ -178,17 +178,18 @@ class HistoryManager:
             if self.current_project.name.lower() != "unsorted" and self.current_project not in self.projects:
                 self.projects.append(self.current_project)
                 logger.info(f"Archived project '{self.current_project.name}' to projects list.")
-            
-            new_project = Project(new_project_name)
-            try:
-                folder_path = os.path.dirname(file_path)
-                structure = self.file_utils.generate_structure(folder_path, folder_path)
-                new_project.folder_structure = structure
-                logger.info(f"Generated new folder structure for project '{new_project_name}'.")
-            except Exception as e:
-                logger.error(f"Failed to generate structure for project '{new_project_name}': {e}")
-            
-            self.current_project = new_project
+
+            if await self.ui.yes_no_prompt("Do you want to generate structure for this file's folder?","No"):
+                new_project = Project(new_project_name)
+                try:
+                    folder_path = os.path.dirname(file_path)
+                    structure = self.file_utils.generate_structure(folder_path, folder_path)
+                    new_project.folder_structure = structure
+                    logger.info(f"Generated new folder structure for project '{new_project_name}'.")
+                except Exception as e:
+                    logger.error(f"Failed to generate structure for project '{new_project_name}': {e}")
+                
+                self.current_project = new_project
 
         # Compute embedding for file path + content
         combined_content = f"Path: {file_path}\nContent: {content}"
