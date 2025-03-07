@@ -18,7 +18,7 @@ CODE_MODEL = "deepseek-coder-v2:16b"
 SHELL_MODEL = "deepseek-coder-v2:16b"
 SYSTEM_MODEL = "deepseek-r1:7b"
 HELPER_MODEL = "deepseek-r1:1.5b"
-VISION_MODEL = "llama3.2-vision:11b"
+VISION_MODEL = "llava:13b"
 EMBEDDING_MODEL = "nomic-embed-text:latest"
 
 # Mapping Mode to Configuration
