@@ -25,16 +25,11 @@ class ChatMode(App):
             self.pswd = None
             self.manager = manager
             self.client = manager.client
-            self.buffer= asyncio.Queue()
             self.rendering = Rendering(self)
             self.fancy_print = self.rendering.fancy_print
             self.transfer_buffer = self.rendering.transfer_buffer
             self.user_input, self.file, self.file_content = user_input,file,file_content
-            self.system_message = (
-            f"\n\n[green]Chat with: [cyan]{self.client.model}[/cyan] in [cyan]{self.client.mode.name}[/cyan] mode."
-            "\nType [red]exit[/red] or press [blue]Ctrl+C[/blue] to quit.[/green]\n"
-
-        )
+            self.system_message = f"\nChat with: [cyan]{self.client.model}[/cyan] in [cyan]{self.client.mode.name}[/cyan] mode.\nType [red]exit[/red] or press [blue]Ctrl+C[/blue] to quit.\n\n"
 
     def compose(self) -> ComposeResult:
         """Create UI layout with a fixed bottom input and scrollable output."""
@@ -52,10 +47,7 @@ class ChatMode(App):
         self.rich_log_widget.styles.border = None
         self.input_widget.styles.border = None
         self.input_widget.focus()
-
-        # Start rendering the output in the background
-        asyncio.create_task(self.rendering.render_output())
-     
+ 
         # Deploy the task with the file and user input if available
         if self.user_input or self.file or self.file_content:
             if self.file_content:
@@ -65,7 +57,7 @@ class ChatMode(App):
             asyncio.create_task(self.manager.deploy_task(self.user_input, self.file,self.file_content))
             self.user_input,self.file,self.file_content = None,None,None
         # Print the system message once the client is initialized
-        asyncio.create_task(self.fancy_print(self.system_message))
+        await self.fancy_print(self.system_message)
 
     async def on_key(self, event: events.Key) -> None:
         """Handles user input from the keyboard."""
@@ -86,7 +78,7 @@ class ChatMode(App):
                     self.exit_app()
                 else:
                   
-                    await self.fancy_print(f"\n\n[bold red]You: [/bold red]{text}")
+                    await self.fancy_print(f"[bold red]You: [/bold red]{text}")
                     self.input_widget.clear()
                     self.input_widget.focus()
                     asyncio.create_task(self.manager.deploy_task(text))
@@ -104,15 +96,15 @@ class ChatMode(App):
         self.input_future = asyncio.Future()
         return self.input_future
 
-    async def get_user_input(self, prompt_text: str = "Enter input:", input_text: str = "", is_password: bool = False):
+    async def get_user_input(self, prompt_text: str = "Enter input:",placeholder: str =  "Type here and press Enter:...", input_text: str = "", is_password: bool = False):
         """Waits for user input asynchronously and returns the value.
         If is_password is True, masks the input like a password.
         """
-        await self.fancy_print(f"\n[cyan]System:[/cyan] {prompt_text}\n")
+        await self.fancy_print(f"[cyan]System:[/cyan] {prompt_text}")
     
               
-        self.input_widget.value = input_text  # Set initial text
-        self.input_widget.placeholder = prompt_text
+        self.input_widget.value = input_text
+        self.input_widget.placeholder = placeholder
 
         if is_password:
             self.input_widget.password = True
@@ -122,8 +114,7 @@ class ChatMode(App):
     
         result = await self.wait_for_input()
         user_input = result.strip() if result else ""
-        
-        
+         
         if is_password:
             self.input_widget.password = False
         self.input_widget.placeholder = "Type here and press Enter:..."
@@ -134,30 +125,22 @@ class ChatMode(App):
     async def yes_no_prompt(self, prompt_text, default="yes"):
         """Prompts the user with yes or no with an optional default."""
         valid_defaults = {"yes": True, "y": True, "no": False, "n": False}
-
-        if default.strip().lower() == "yes":
-            color = "green"
-        elif default.strip().lower() == "no":
-            color = "red"
-        else:
-            color = "white"
-
-        prompt_text = (
-        f"{prompt_text}\n"
-        "\n[green]Yes[/green] or [red]No[/red]\n"
-        f"[blue]Enter[/blue] for a quick [{color}]{default}[/{color}]"
-        )
         
         while True:
-            choice = await self.get_user_input(prompt_text=prompt_text)
+            choice = await self.get_user_input(prompt_text=prompt_text,placeholder=f"Type Yes or No. Default: {default}")
 
             if not choice and default:
-                return valid_defaults.get(default.strip().lower(), None)  # Use default if valid
+                return valid_defaults.get(default.strip().lower(), None)
 
             if choice:
                 choice = choice.strip().lower()
-                if choice in valid_defaults:
+
+                if choice.lower() == "exit":
+                    self.exit_app()
+
+                elif choice in valid_defaults:
                     return valid_defaults[choice]
 
-            await self.fancy_print("\n[cyan]System: [/cyan] It is a [green]Yes[/green] or [red]No[/red] question.")
+                else:
+                    await self.fancy_print("\n[cyan]System: [/cyan] It is a [green]Yes[/green] or [red]No[/red] question.")
 

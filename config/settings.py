@@ -13,12 +13,12 @@ class Mode(Enum):
 # Ollama Settings
 DEFAULT_HOST = "http://localhost:11434"
 
-DEFAULT_MODEL = "deepseek-r1:7b"
+DEFAULT_MODEL = "deepseek-r1:8b"
 CODE_MODEL = "deepseek-coder-v2:16b"
 SHELL_MODEL = "deepseek-coder-v2:16b"
-SYSTEM_MODEL = "deepseek-r1:7b"
+SYSTEM_MODEL = "deepseek-r1:8b"
 HELPER_MODEL = "deepseek-r1:1.5b"
-VISION_MODEL = "llava:13b"
+VISION_MODEL = "llava:7b"
 EMBEDDING_MODEL = "nomic-embed-text:latest"
 
 # Mapping Mode to Configuration
@@ -35,6 +35,9 @@ MODE_CONFIGS = {
 #Logging
 LOGGING = True
 LOGGING_LEVEL = "info"
+
+#Rendering
+RENDER_DELAY = 0.01 #Delay between rendering lines
 
 #HistoryManager
 MSG_THR = 0.5 # Simularity threshold for history

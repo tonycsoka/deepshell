@@ -1,79 +1,102 @@
 import re
 import asyncio
 from utils.logger import Logger
+from config.settings import RENDER_DELAY
 
 logger = Logger.get_logger()
 
 class Rendering:
     def __init__(self, chat_app):
         self.chat_app = chat_app
+        self.cleaner = re.compile(r'(#{3,4}|\*\*)')
+        self.delay = RENDER_DELAY
+        self._lock = asyncio.Lock()
 
-    async def render_output(self):
-        """Rendering the content from the buffer,word by word"""
-        accumulated_text = ""
-        while True:
-            chunk = await self.chat_app.buffer.get()
-            if chunk is None:
-                await asyncio.sleep(1)
-                continue
-            chunk = chunk.replace("###", "")
-            chunk = chunk.replace("####", "")
-            chunk = chunk.replace("**", "")
-
-            accumulated_text += chunk
-            self.chat_app.rich_log_widget.clear()
-            self.chat_app.rich_log_widget.write(accumulated_text)
+    async def render_output(self, line):
+        """Rendering lines while stripping away some of the markdown tags"""
+        async with self._lock:
+            cleaned_line = self.cleaner.sub('', line.strip()) 
+            self.chat_app.rich_log_widget.write(cleaned_line, animate=True)
             self.chat_app.rich_log_widget.scroll_end()
 
-
-    async def fancy_print(self, content, delay=0.01):
-        """Render string word by word, preserving newlines and other whitespace."""
-       
-        while not self.chat_app.buffer.empty():
-            await asyncio.sleep(0.5)
+    async def fancy_print(self, content):
+        """Render string line by line, preserving newlines and other whitespace."""
         self.chat_app.input_widget.disabled = True
-        chunks = re.split(r'(\s+)', content)
+        lines = content.split('\n')
         
-        for chunk in chunks:
-            if chunk == '\n':  # Handle newline separately to ensure correct formatting
-                await self.chat_app.buffer.put('\n')  # Send newline directly to the buffer
-            else:
-                await self.chat_app.buffer.put(chunk)  # Send words to buffer
-            await asyncio.sleep(delay)
+        for line in lines:
+            await self.render_output(line) 
+            await asyncio.sleep(self.delay)
+        
         self.chat_app.input_widget.disabled = False
-        self.chat_app.input_widget.focus() 
-
+        self.chat_app.input_widget.focus()
    
     async def transfer_buffer(self, content):
         """
         Continuously transfer data from the source_buffer (e.g., filtering's buffer)
-        into the UI's rendering buffer, but only if the transfer is enabled.
+        into the UI's rendering buffer.
+        Accumulates lines before transferring them.
+        Skips lines that consist solely of newlines or spaces.
         """
         self.chat_app.input_widget.disabled = True
+        accumulated_line = ""
+        first_chunk = True
 
         try:
             if isinstance(content, asyncio.Queue):
                 while True:
                     chunk = await content.get()
                     if chunk is None:
+                        if accumulated_line and accumulated_line.strip():
+                            await self.render_output(accumulated_line)
+                        accumulated_line = ""
                         self.chat_app.input_widget.disabled = False
                         self.chat_app.input_widget.focus()
                         break
-                    await self.chat_app.buffer.put(chunk)
+                    if first_chunk:
+                        chunk = "[green]AI: [/]" + chunk.lstrip("\n")
+                        first_chunk = False
+                    accumulated_line += chunk
+
+                    if "\n" in accumulated_line:
+                        if accumulated_line.strip():
+                            await self.render_output(accumulated_line)
+                        accumulated_line = ""  
 
             elif hasattr(content, "__aiter__"):
                 async for chunk in content:
-                    await self.chat_app.buffer.put(chunk)
+                    if first_chunk:
+                        chunk = "[green]AI: [/]" + chunk.lstrip("\n")
+                        first_chunk = False
+                    accumulated_line += chunk
+
+                    if "\n" in accumulated_line:
+                        if accumulated_line.strip():
+                            await self.render_output(accumulated_line)
+                        await asyncio.sleep(self.delay)
+                        accumulated_line = ""
 
             else:
-                await self.chat_app.buffer.put(content)
+                if first_chunk:
+                    content = "[green]AI: [/]" + content.lstrip("\n")
+                    first_chunk = False
+                accumulated_line += content
+                if "\n" in accumulated_line:
+                    if accumulated_line.strip():
+                        await self.render_output(accumulated_line)
+                    await asyncio.sleep(self.delay)
+                    accumulated_line = ""
 
         except Exception as e:
             self.chat_app.input_widget.disabled = False
             self.chat_app.input_widget.focus()
             raise e
 
+        if accumulated_line:
+            if accumulated_line.strip():
+                await self.render_output(accumulated_line)
+            await asyncio.sleep(self.delay)
+
         self.chat_app.input_widget.disabled = False
         self.chat_app.input_widget.focus()
-
 

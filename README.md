@@ -39,7 +39,7 @@ For those who prefer the traditional way:
 ```sh
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull deepseek-r1:1.5b
-ollama pull deepseek-r1:7b
+ollama pull deepseek-r1:8b
 ollama pull deepseek-coder-v2:16b
 ollama pull llava:13b
 ollama pull nomic-embed-text:latest

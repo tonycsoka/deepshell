@@ -78,7 +78,7 @@ class PipeFilter:
         thoughts = re.findall(r"<think>(.*?)</think>", full_text, flags=re.DOTALL)
         self.ollama_client.last_response = results
         self.ollama_client.thoughts.append(thoughts)
-        logger.debug(f"PipeFilter output: {results} \n Thoughts: {thoughts}")
+        logger.debug(f"PipeFilter output: {results} \nThoughts: {thoughts}")
         await self.buffer.put(None)
 
     async def process_static(self, text: str, extract_code=False):

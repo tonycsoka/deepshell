@@ -93,7 +93,7 @@ class ChatManager:
         
         if bypass:
             logger.info("Bypassing mode, executing shell mode.")
-            await self._handle_shell_mode(user_input, bypass)
+            return await self._handle_shell_mode(user_input, bypass)
         
         if self.client.mode in mode_handlers:
             logger.info("Handling task in mode: %s", self.client.mode)
@@ -107,7 +107,6 @@ class ChatManager:
         Handles tasks when the client is in SHELL mode.
         """
         logger.info("Shell mode execution started. Bypass: %s", bypass)
-        print_output = None
         
         if not bypass:
             input = await self._handle_code_mode(PromptHelper.shell_helper(input), no_render=True)
@@ -118,21 +117,18 @@ class ChatManager:
         if output and input:
             logger.info("Command executed, processing output.")
             if self.ui:
-                system_message = "\n[cyan]System:[/] Output submitted to the chatbot for analysis..."         
+                system_message = "[cyan]System:[/] Output submitted to the chatbot for analysis..."         
 
-                await self.ui.fancy_print(f"\n[cyan]System:[/] Executing [green]'{input}'[/]\n")
+                await self.ui.fancy_print(f"[cyan]System:[/] Executing [green]'{input}'[/]")
                
                 if await self.ui.yes_no_prompt("Do you want to see the output?", default="No"):
-                    print_output = asyncio.create_task(self.ui.fancy_print(f"\n[blue]Output[/]:\n{output}\n{system_message}"))
+                   asyncio.create_task(self.ui.fancy_print(f"[blue]Output[/]:\n{output}\n\n{system_message}\n"))
                             
             prompt = PromptHelper.analyzer_helper(input, output)
             self.client.switch_mode(Mode.SYSTEM)
-            summary = asyncio.create_task(self._handle_default_mode(prompt))
-            if print_output:
-                await asyncio.gather(print_output,summary)
-            else:
-                await summary
-            summary = self.client.last_response 
+            summary = await self._handle_default_mode(prompt)
+           
+            
             if self.client.keep_history and summary:
                 await self.add_terminal_output(input,output,summary)
             return summary
@@ -193,7 +189,8 @@ class ChatManager:
         self.tasks = [get_stream, process_text]
         
         if self.ui and not no_render:
-            asyncio.create_task(self.ui.transfer_buffer(filtering.buffer))
+            rendering_task = asyncio.create_task(self.ui.transfer_buffer(filtering.buffer))
+            self.tasks.append(rendering_task)
        
         try:
             await asyncio.gather(*self.tasks, return_exceptions=True)
