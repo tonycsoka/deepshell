@@ -32,6 +32,18 @@ class ChatManager:
         self.file_utils.set_index_functions(self.history_manager.add_file,self.history_manager.add_folder_structure)
 
         self.tasks = []
+        
+    async def init_shell(self):
+        """
+        Helper functon to initialize shell session.
+        """
+        await self.executor.start_shell()
+
+    async def stop_shell(self):
+        """
+        Helper functon to stop the shell session.
+        """
+        await self.executor.stop_shell()
        
     async def deploy_task(self, user_input=None, file_name=None, file_content=None):
         """
@@ -112,7 +124,12 @@ class ChatManager:
             input = await self._handle_code_mode(PromptHelper.shell_helper(input), no_render=True)
             input, output = await self.executor.start(input)
         else:
-            output = await self.executor.execute_command(input)
+            output = await self.executor.run_command(input)
+
+        if output == "pass":
+            if self.ui:
+                await self.ui.fancy_print("[cyan]System:[/] command executed successfully")
+            return "pass"
         
         if output and input:
             logger.info("Command executed, processing output.")
@@ -122,7 +139,7 @@ class ChatManager:
                 await self.ui.fancy_print(f"[cyan]System:[/] Executing [green]'{input}'[/]")
                
                 if await self.ui.yes_no_prompt("Do you want to see the output?", default="No"):
-                   asyncio.create_task(self.ui.fancy_print(f"[blue]Output[/]:\n{output}\n\n{system_message}\n"))
+                   asyncio.create_task(self.ui.fancy_print(f"\n[blue]Shell output[/]:\n{output}\n\n{system_message}\n"))
                             
             prompt = PromptHelper.analyzer_helper(input, output)
             self.client.switch_mode(Mode.SYSTEM)

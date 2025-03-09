@@ -48,17 +48,18 @@ OFF_FREQ = 4 # Off-topic checking frequency  (messages)
 SLICE_SIZE = 4 # Last N messages to analyze for off-topic 
 
 #ShellUtils Config
-SHELL_TYPE = "bash"
-MONITOR_INTERVAL = 60 # Timeout until when user will be prompted to abort the execution
-MAX_OUTPUT_LINES = 600
-OUTPUT_VALIDATION = True
+SHELL_TYPE = "/bin/bash"
+MONITOR_INTERVAL = 60 # Timeout until when user will be prompted to abort command execution 
+FINALIZE_OUTPUT = True # Output post-processing such as trimming
+MAX_OUTPUT_LINES = 1000
+
 
 #FileProcessing Config 
-PROCESS_IMAGES = False #Turn this on if you want to get a description of the images
+PROCESS_IMAGES = False # Turn this on if you want to get a description of the images
 IMG_INPUT_RES = (672, 672)
 
-MAX_FILE_SIZE = 3 * 1024 * 1024 #3MB
-MAX_LINES = 600
+MAX_FILE_SIZE = 6 * 1024 * 1024 #6MB
+MAX_LINES = 1000
 CHUNK_SIZE = 4000
 
 SUPPORTED_EXTENSIONS = [

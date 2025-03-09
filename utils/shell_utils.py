@@ -3,7 +3,7 @@ import string
 import asyncio
 import secrets
 from utils.logger import Logger
-from config.settings import SHELL_TYPE, MONITOR_INTERVAL, MAX_OUTPUT_LINES, OUTPUT_VALIDATION
+from config.settings import SHELL_TYPE, MONITOR_INTERVAL, MAX_OUTPUT_LINES, FINALIZE_OUTPUT
 
 logger = Logger.get_logger()
 
@@ -28,10 +28,84 @@ class CommandExecutor:
         self.sudo_password = None
         self.monitor_interval = MONITOR_INTERVAL
         self.max_output_lines = MAX_OUTPUT_LINES
-        self.output_validation = OUTPUT_VALIDATION
+        self.finalize_output = FINALIZE_OUTPUT
         self.shell_type = SHELL_TYPE
+        self.process: asyncio.subprocess.Process | None = None
         if self.ui:
             self.sudo_password = self.ui.pswd
+
+
+    async def start_shell(self):
+        """Starts a persistent shell session if not already running."""
+ 
+        if self.process is None or self.process.returncode is not None:
+            self.process = await asyncio.create_subprocess_exec(
+                self.shell_type,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            logger.info("Started persistent shell session.")
+
+   
+    async def run_command(self, command: str) -> str:
+        """Runs a command in the persistent shell and returns output, even if the command is silent."""
+        if self.process is None or self.process.stdin is None or self.process.stdout is None:
+            await self.start_shell()
+            if self.process is None or self.process.stdin is None or self.process.stdout is None:
+                logger.error("Failed to start shell process.")
+                return "Error: Shell process could not be started."
+
+        if command.strip().startswith("sudo"):
+            sudo_password = await self._get_sudo_password()
+            command = f"echo {sudo_password} | sudo -S {command[5:].strip()}"
+
+        # Send command + echo $? to confirm execution
+        full_command = f"{command}\n echo $?\n"
+        self.process.stdin.write(full_command.encode())
+        await self.process.stdin.drain()
+        
+        monitor_task = asyncio.create_task(self._monitor_execution(self.process))
+        # Read output in chunks
+        output_lines = []
+        exit_code = None
+        while True:
+            line = await self.process.stdout.readline()
+            if not line:
+                break
+            decoded_line = line.decode(errors="ignore").strip()
+
+            # Capture exit code
+            if decoded_line.isdigit():
+                exit_code = int(decoded_line)
+                break
+            else:
+                decoded_line = self._extract_meaningful_text(decoded_line)
+            output_lines.append(decoded_line)
+
+        result = "\n".join(output_lines).strip()
+        monitor_task.cancel()
+
+       
+        if exit_code == 0 and not result: 
+            logger.info("Command executed successfully with no output")
+            return "pass"
+
+        if result and self.finalize_output:
+           
+            result = await self._finalize_command_output(output_lines)
+        
+        return result if result else f"Command failed with exit code {exit_code}"
+
+
+
+    async def stop_shell(self):
+        """Stops the persistent shell session."""
+        if self.process:
+            self.process.terminate()
+            await self.process.wait()
+            self.process = None
+            logger.info("Shell session terminated.")
  
    
     async def start(self, command=None):
@@ -54,7 +128,7 @@ class CommandExecutor:
             confirmed_command = await self.confirm_execute_command(command)
             if confirmed_command:
                 logger.info("Command confirmed, executing.")
-                output = await self.execute_command(confirmed_command)
+                output = await self.run_command(confirmed_command)
             else:
                 return None, None
         
@@ -94,7 +168,7 @@ class CommandExecutor:
             return "Error: Command did not produce valid output or is not interactive."
 
         logger.info("Processing command output.")
-        return await self._process_command_output(proc, command)
+        return await self._process_command_output(proc)
 
     async def _get_sudo_password(self):
         """
@@ -131,7 +205,7 @@ class CommandExecutor:
         """
         command = f"echo {sudo_password} | sudo -S -v"
         proc = await self._start_subprocess(command)
-        _, stderr = await proc.communicate()
+       
         if proc.returncode == 0:
             logger.info("Sudo password validated.")
             sudo_password = secrets.token_urlsafe(32)
@@ -153,21 +227,19 @@ class CommandExecutor:
             subprocess.Process: The subprocess object.
         """
         return await asyncio.create_subprocess_shell(
-            f"{self.shell_type} -c '{command}'",  # Use the selected shell
+            f"{self.shell_type} -c '{command}'",
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
 
 
-    async def _process_command_output(self, proc, command):
+    async def _process_command_output(self, proc):
         """
         Processes the output of a running command.
         
         Args:
-            proc (subprocess.Process): The running subprocess.
-            command (str): The executed command.
-        
+            proc (subprocess.Process): The running subprocess.        
         Returns:
             str: The processed command output.
         """
@@ -202,10 +274,9 @@ class CommandExecutor:
         # Validate if we received output
         if not output_lines:
             output_lines.append("No output received. Command may require user interaction or is piped.")
-
-        output, error = await proc.communicate()
+ 
         logger.info("Command output processing completed.")
-        return await self._finalize_command_output(proc, command, output_lines, output, error)
+        return await self._finalize_command_output(output_lines)
 
 
     def _extract_meaningful_text(self, data):
@@ -250,45 +321,29 @@ class CommandExecutor:
                 break
 
     
-    async def _finalize_command_output(self, proc, command, output_lines, output, error):
+    async def _finalize_command_output(self, output_lines):
         """
         Finalizes the command output, ensuring truncation if too long and handling errors.
 
         Args:
-            proc (asyncio.subprocess.Process): The completed process.
-            command (str): The executed command.
             output_lines (list): Collected output lines.
-            output (bytes): Standard output from the process.
-            error (bytes): Standard error from the process.
+        
 
         Returns:
-            str: The final output or an error message if the command failed.
+            str: The final output.
         """
         logger.info("Finalizing command output.")
-        additional_output = output.decode("utf-8", errors="ignore").strip() if output else ""
-
-        # Append additional output to the list if it exists
-        if additional_output:
-            output_lines.extend(additional_output.splitlines())
-
-        error_str = error.decode("utf-8", errors="ignore").strip() if error else ""
-
-        # Validate if we received output
-        if not output_lines:
-            output_lines = ["No output received. Command may require user interaction or is piped."]
 
         # Truncate based on the number of lines
         if len(output_lines) > self.max_output_lines:
             logger.warning("Output truncated due to line limit.")
             output_lines = output_lines[:self.max_output_lines] + ["[Output truncated]"]
 
-        output_str = "\n".join(output_lines)
-
-        self.history.append({"command": command, "output": output_str, "error": error_str})
+        output_str = "\n".join(output_lines) 
         self._clear_sudo_password()
         logger.info("Command execution completed.")
         
-        return output_str if proc.returncode == 0 else f"Error: {error_str}"
+        return output_str
 
     def _clear_sudo_password(self):
         """

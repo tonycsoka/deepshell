@@ -47,6 +47,8 @@ class ChatMode(App):
         self.rich_log_widget.styles.border = None
         self.input_widget.styles.border = None
         self.input_widget.focus()
+
+        asyncio.create_task(self.manager.init_shell())
  
         # Deploy the task with the file and user input if available
         if self.user_input or self.file or self.file_content:
@@ -62,7 +64,7 @@ class ChatMode(App):
     async def on_key(self, event: events.Key) -> None:
         """Handles user input from the keyboard."""
         if event.key =="ctrl+c":
-            self.exit_app()
+            await self.exit_app()
 
         if event.key == "enter":
             text = self.input_widget.value or ""
@@ -75,7 +77,7 @@ class ChatMode(App):
                 return
             if text:
                 if text.lower() == "exit":
-                    self.exit_app()
+                    await self.exit_app()
                 else:
                   
                     await self.fancy_print(f"[bold red]You: [/bold red]{text}")
@@ -84,7 +86,8 @@ class ChatMode(App):
                     asyncio.create_task(self.manager.deploy_task(text))
         
 
-    def exit_app(self):
+    async def exit_app(self):
+        await self.manager.stop_shell()
         if self.pswd:
             self.pswd = secrets.token_urlsafe(32)
             self.pswd = None
@@ -136,7 +139,7 @@ class ChatMode(App):
                 choice = choice.strip().lower()
 
                 if choice.lower() == "exit":
-                    self.exit_app()
+                    await self.exit_app()
 
                 elif choice in valid_defaults:
                     return valid_defaults[choice]
