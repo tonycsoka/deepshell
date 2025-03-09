@@ -37,7 +37,7 @@ LOGGING = True
 LOGGING_LEVEL = "info"
 
 #Rendering
-RENDER_DELAY = 0.01 #Delay between rendering lines
+RENDER_DELAY = 0.01 # Delay between rendering lines
 
 #HistoryManager
 MSG_THR = 0.5 # Simularity threshold for history
@@ -47,7 +47,8 @@ OFF_THR = 0.7 # Off-topic threshold
 OFF_FREQ = 4 # Off-topic checking frequency  (messages)
 SLICE_SIZE = 4 # Last N messages to analyze for off-topic 
 
-#ShellUtils Config 
+#ShellUtils Config
+SHELL_TYPE = "bash"
 MONITOR_INTERVAL = 60 # Timeout until when user will be prompted to abort the execution
 MAX_OUTPUT_LINES = 600
 OUTPUT_VALIDATION = True

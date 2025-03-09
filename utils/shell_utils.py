@@ -3,7 +3,7 @@ import string
 import asyncio
 import secrets
 from utils.logger import Logger
-from config.settings import MONITOR_INTERVAL, MAX_OUTPUT_LINES, OUTPUT_VALIDATION
+from config.settings import SHELL_TYPE, MONITOR_INTERVAL, MAX_OUTPUT_LINES, OUTPUT_VALIDATION
 
 logger = Logger.get_logger()
 
@@ -29,6 +29,7 @@ class CommandExecutor:
         self.monitor_interval = MONITOR_INTERVAL
         self.max_output_lines = MAX_OUTPUT_LINES
         self.output_validation = OUTPUT_VALIDATION
+        self.shell_type = SHELL_TYPE
         if self.ui:
             self.sudo_password = self.ui.pswd
  
@@ -140,6 +141,7 @@ class CommandExecutor:
             logger.warning("Invalid sudo password.")
             return False
 
+    
     async def _start_subprocess(self, command):
         """
         Starts an asynchronous subprocess to execute a command.
@@ -151,11 +153,12 @@ class CommandExecutor:
             subprocess.Process: The subprocess object.
         """
         return await asyncio.create_subprocess_shell(
-            command,
+            f"{self.shell_type} -c '{command}'",  # Use the selected shell
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+
 
     async def _process_command_output(self, proc, command):
         """
