@@ -163,27 +163,15 @@ class ChatManager:
         """
         Handles tasks when the client is in CODE mode.
         """
-        code = None
         logger.info("Code mode execution started.")
-        if self.client.mode == Mode.CODE:
-            get_stream = asyncio.create_task(self.client._chat_stream(input))
-            process_text = asyncio.create_task(self.filtering.process_stream(True))
-            self.tasks = [get_stream, process_text]
-            await asyncio.gather(*self.tasks)
-            
-            code = self.filtering.extracted_code
+       
+        response = await self.client._fetch_response(input)
+        code = await self.filtering.process_static(response,True)
+
+        if code:
             if self.ui and not no_render:
                 await self.ui.fancy_print(code)
-            
-            self.tasks = []
-            
-            logger.info("Code mode execution completed.")
-        #extracting shell command
-        elif self.client.mode == Mode.SHELL:
-            response = await self.client._fetch_response(input)
-            code = await self.filtering.process_static(response,True)
-        
-        return code
+            return code
 
     async def _handle_default_mode(self, input= None, history = None, no_render=False):
         """
