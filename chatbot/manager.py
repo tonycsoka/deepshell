@@ -1,4 +1,5 @@
 import asyncio
+from asyncio.tasks import create_task
 from ui.ui import ChatMode
 from utils.logger import Logger
 from config.settings import Mode
@@ -139,16 +140,29 @@ class ChatManager:
                 await self.ui.fancy_print(f"[cyan]System:[/] Executing [green]'{input}'[/]")
                
                 if await self.ui.yes_no_prompt("Do you want to see the output?", default="No"):
-                   asyncio.create_task(self.ui.fancy_print(f"\n[blue]Shell output[/]:\n{output}\n\n{system_message}\n"))
-                            
+                   render_task = asyncio.create_task(self.ui.fancy_print(f"\n[blue]Shell output[/]:\n{output}\n\n{system_message}\n"))
+                   self.tasks.append(render_task)
+
             prompt = PromptHelper.analyzer_helper(input, output)
             self.client.switch_mode(Mode.SYSTEM)
-            summary = await self._handle_default_mode(prompt)
-           
+            
+            get_summary = asyncio.create_task(self.client._chat_stream(prompt))
+            filter_summary = asyncio.create_task(self.filtering.process_stream(False))
+
+            self.tasks.append(get_summary)
+            self.tasks.append(filter_summary)
+            
+            await self.execute_tasks()
+
+            summary = self.client.last_response
+            self.client.last_response = ""
+            if self.ui:
+                await self.ui.transfer_buffer(self.filtering.buffer) 
             
             if self.client.keep_history and summary:
                 await self.add_terminal_output(input,output,summary)
             return summary
+
         else:
             logger.warning("No output detected.")
             if self.ui:
@@ -178,7 +192,7 @@ class ChatManager:
         Handles tasks when the client is in the default mode.
         """
         logger.info("Default mode execution started.")
-        
+
         client = self.client
         filtering = self.filtering
         if history and not input:
@@ -197,14 +211,16 @@ class ChatManager:
             rendering_task = asyncio.create_task(self.ui.transfer_buffer(filtering.buffer))
             self.tasks.append(rendering_task)
        
+        await self.execute_tasks() 
+        logger.info("Default mode execution completed.")
+
+        return client.last_response
+
+    async def execute_tasks(self):
         try:
             await asyncio.gather(*self.tasks, return_exceptions=True)
         except Exception as e:
             logger.error(f"Error in default mode execution: {e}")
 
         self.tasks = []
-
-        logger.info("Default mode execution completed.")
-
-        return client.last_response
 

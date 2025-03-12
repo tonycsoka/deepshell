@@ -48,25 +48,24 @@ class CommandExecutor:
             logger.info("Started persistent shell session.")
 
    
+   
     async def run_command(self, command: str) -> str:
-        """Runs a command in the persistent shell and returns output, even if the command is silent."""
         if self.process is None or self.process.stdin is None or self.process.stdout is None:
             await self.start_shell()
             if self.process is None or self.process.stdin is None or self.process.stdout is None:
                 logger.error("Failed to start shell process.")
-                return "Error: Shell process could not be started."
-
+                return "Error: Shell process could not be started." 
+        
         if command.strip().startswith("sudo"):
-            sudo_password = await self._get_sudo_password()
-            command = f"echo {sudo_password} | sudo -S {command[5:].strip()}"
+            await self._get_sudo_password()
 
-        # Send command + echo $? to confirm execution
-        full_command = f"{command}\n echo $?\n"
+              
+        # Build the full command with stdbuf to line-buffer the output.
+        full_command = f"stdbuf -oL {command}\n echo $?\n"
         self.process.stdin.write(full_command.encode())
         await self.process.stdin.drain()
         
         monitor_task = asyncio.create_task(self._monitor_execution(self.process))
-        # Read output in chunks
         output_lines = []
         exit_code = None
         while True:
@@ -74,25 +73,21 @@ class CommandExecutor:
             if not line:
                 break
             decoded_line = line.decode(errors="ignore").strip()
-
-            # Capture exit code
             if decoded_line.isdigit():
                 exit_code = int(decoded_line)
                 break
             else:
                 decoded_line = self._extract_meaningful_text(decoded_line)
             output_lines.append(decoded_line)
-
+        
         result = "\n".join(output_lines).strip()
         monitor_task.cancel()
-
-       
+        
         if exit_code == 0 and not result: 
             logger.info("Command executed successfully with no output")
             return "pass"
-
+        
         if result and self.finalize_output:
-           
             result = await self._finalize_command_output(output_lines)
         
         return result if result else f"Command failed with exit code {exit_code}"
@@ -189,10 +184,11 @@ class CommandExecutor:
                     if self.ui:
                         self.ui.pswd = None
                     self.sudo_password = None
-                    await self._print_message("\nWrong password")
+                    await self._print_message("Wrong password")
                     logger.warning("Wrong sudo password")
                     return None
 
+    
     async def _validate_sudo_password(self, sudo_password):
         """
         Validates the provided sudo password.
@@ -204,13 +200,37 @@ class CommandExecutor:
             bool: True if valid, False otherwise.
         """
         command = f"echo {sudo_password} | sudo -S -v"
-        proc = await self._start_subprocess(command)
-       
-        if proc.returncode == 0:
+        
+        # If we have an existing persistent shell with valid stdin and stdout, use it.
+        if self.process is not None and self.process.stdin is not None and self.process.stdout is not None:
+            full_command = f"stdbuf -oL {command}\n echo $?\n"
+            self.process.stdin.write(full_command.encode())
+            await self.process.stdin.drain()
+            
+            exit_code = None
+            while True:
+                line = await self.process.stdout.readline()
+                if not line:
+                    break
+                decoded_line = line.decode(errors="ignore").strip()
+                # Assume the exit code is output as a standalone digit.
+                if decoded_line.isdigit():
+                    exit_code = int(decoded_line)
+                    break
+            proc_valid = (exit_code == 0)
+        else:
+            # Fall back to spawning a new subprocess.
+            proc = await self._start_subprocess(command)
+            # Wait for the process to complete.
+            stdout, stderr = await proc.communicate()
+            proc_valid = (proc.returncode == 0)
+
+        if proc_valid:
             logger.info("Sudo password validated.")
+            # Overwrite and clear the password for security.
             sudo_password = secrets.token_urlsafe(32)
             sudo_password = None
-            return True 
+            return True
         else:
             logger.warning("Invalid sudo password.")
             return False
@@ -316,7 +336,7 @@ class CommandExecutor:
                 "\nCommand is taking longer than expected. Cancel execution? (y/n): "
             )
             if user_choice.strip().lower() in ["y", "yes"]:
-                await self._print_message("\nTerminating command execution...")
+                await self._print_message("Terminating command execution...")
                 proc.terminate()
                 break
 
@@ -440,9 +460,10 @@ class CommandExecutor:
         else:
             return input(prompt_text)
 
+
     async def _print_message(self, message: str):
-        if self.ui is not None:
-            await self.ui.fancy_print(message)
+        """Print messages either through UI or terminal."""
+        if self.ui:
+            await self.ui.fancy_print(f"[cyan]System:[/cyan] {message}")
         else:
             print(message)
-
