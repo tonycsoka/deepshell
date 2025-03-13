@@ -98,7 +98,7 @@ class Topic:
         """Stores raw messages and their embeddings."""
         self.history.append({"role": role, "content": message})
         self.history_embeddings.append(embedding)
-        logger.info(f"Message added to {self.name}")
+        logger.info(f"Message added to: {self.name}")
 
     async def get_relevant_context(self, embedding) -> tuple[float, int]:
         """
@@ -141,7 +141,7 @@ class HistoryManager:
         self.ui = manager.ui
         self.similarity_threshold = MSG_THR
         self.topics: list[Topic] = []
-        self.current_topic = Topic()
+        self.current_topic = Topic("Initial topic")
         self.embedding_cache: dict[str, np.ndarray] = {}
         self.projects: list[Project] = []
         self.current_project = Project("Unsorted")
@@ -534,7 +534,7 @@ class HistoryManager:
           4. Finally, the off-topic messages are removed from the current topic.
         """
         # If the current topic is unnamed but has > 4 messages, generate a topic name/description.
-        if len(self.current_topic.history) > 4 and not self.current_topic.name.strip():
+        if len(self.current_topic.history) > 4 and not self.current_topic.description.strip():
             new_topic_name, new_topic_desc = await self.generate_topic_info_from_history(self.current_topic.history)
             if new_topic_name and new_topic_desc:
                 self.current_topic.name = new_topic_name

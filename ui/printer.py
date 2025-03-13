@@ -7,6 +7,6 @@ def printer(content):
         if loop.is_running():
             asyncio.create_task(Rendering._fancy_print(content))
         else:
-            asyncio.run(Rendering._fancy_print(f"[yellow]LOG[/]: {content}"))
+            asyncio.run(Rendering._fancy_print(content))
     except Exception:
        pass

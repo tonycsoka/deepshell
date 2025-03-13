@@ -19,18 +19,19 @@ class Logger:
     @classmethod
     def get_logger(cls, name="deepshell", level=LOG_LEVEL, log_file="deepshell.log"):
         """Returns a logger instance with a selectable log level, logging only to a file."""
-        if cls._logger is None and cls._logging_enabled:
+        if cls._logger is None:
             cls._logger = logging.getLogger(name)
             log_level = cls.LEVELS.get(level.lower(), logging.INFO)
             cls._logger.setLevel(log_level)
  
-            if cls._use_file_handler:
+            if cls._use_file_handler and cls._logging_enabled:
                 file_handler = logging.FileHandler(log_file)
                 file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
                 file_handler.setFormatter(file_formatter)
                 cls._logger.addHandler(file_handler)
 
-            if cls._use_fancy_print:
+            if cls._use_fancy_print and cls._logging_enabled:
+
                 cls._logger.addHandler(FancyPrintHandler())
 
         return cls._logger
@@ -39,11 +40,31 @@ class Logger:
 class FancyPrintHandler(logging.Handler):
     def __init__(self):
         super().__init__()
-      
+
     def emit(self, record):
-        """Emit the log record using fancy_print."""
+        """Emit the log record using fancy_print with colors."""
         try:
+
             msg = self.format(record)
-            printer(msg)
+            colored_msg = self._apply_color(msg, record.levelno)
+            level_name = record.levelname
+            formatted_msg = f"[{level_name}] {msg}"
+            colored_msg = self._apply_color(formatted_msg, record.levelno)
+
+            printer(colored_msg)
         except Exception:
             self.handleError(record)
+
+    def _apply_color(self, msg, level):
+        """Apply color formatting based on the log level."""
+        color_map = {
+            logging.DEBUG: 'blue',
+            logging.INFO: 'green',
+            logging.WARNING: 'yellow',
+            logging.ERROR: 'red',
+            logging.CRITICAL: 'purple',
+        }
+        
+        color = color_map.get(level, 'white')
+
+        return f"[{color}]{msg}[/]"
