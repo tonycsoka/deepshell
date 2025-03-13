@@ -1,5 +1,4 @@
 from enum import Enum, auto
-from config.system_prompts import *
 
 class Mode(Enum):
     DEFAULT = auto()
@@ -24,9 +23,9 @@ EMBEDDING_MODEL = "nomic-embed-text:latest"
 # Mapping Mode to Configuration
 MODE_CONFIGS = {
     Mode.DEFAULT: {"model": DEFAULT_MODEL, "temp": 0.4, "prompt": "", "stream": True},
-    Mode.CODE:    {"model": CODE_MODEL, "temp": 0.5, "prompt": CODE, "stream": True},
-    Mode.SHELL:   {"model": SHELL_MODEL, "temp": 0.4, "prompt": SHELL, "stream": True},
-    Mode.SYSTEM:  {"model": SYSTEM_MODEL, "temp": 0.5, "prompt": SYSTEM, "stream": True},
+    Mode.CODE:    {"model": CODE_MODEL, "temp": 0.5, "prompt": "", "stream": True},
+    Mode.SHELL:   {"model": SHELL_MODEL, "temp": 0.4, "prompt": "", "stream": True},
+    Mode.SYSTEM:  {"model": SYSTEM_MODEL, "temp": 0.5, "prompt": "", "stream": True},
     Mode.HELPER:  {"model": HELPER_MODEL, "temp": 0.5, "prompt": "", "stream": False},
     Mode.VISION:  {"model": VISION_MODEL, "temp": 0.6, "prompt": "", "stream": False},
 
@@ -34,7 +33,7 @@ MODE_CONFIGS = {
 
 #Logging
 LOG = True
-LOG_LEVEL = "info"
+LOG_LEVEL = "info" #Possible values: debug, info, warning, error, critical
 LOG_TO_FILE = True 
 LOG_TO_UI = False
 

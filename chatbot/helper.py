@@ -12,6 +12,7 @@ class PromptHelper:
     user_system = platform.uname()
     current_time = datetime.now().isoformat()
 
+
     @staticmethod
     def shell_helper(user_input: str) -> str:
         """
@@ -21,13 +22,17 @@ class PromptHelper:
             user_input (str): The user's request for a shell command.
 
         Returns:
-            str: A formatted prompt instructing the model to generate a shell command.
+            str: A formatted prompt instructing the model to generate a non-interactive shell command.
         """
         return f"""
-        You are a shell command generator only.
-        In response to a user request generate a shell command for {PromptHelper.user_system}
-        Do not include anything else beyond the command itself. If command requires administrative privileges, make sure to include 'sudo'.
-        User request: {user_input}"""
+        You are a shell command generator that produces commands meant for automated execution.
+        In response to a user request, generate a shell command for {PromptHelper.user_system} that runs non-interactively.
+        If the command normally requires interactive input or confirmation, include appropriate flags (such as '-y' or '--non-interactive') to bypass them.
+        Do not include any additional text beyond the command itself.
+        If the command requires administrative privileges, include 'sudo'.
+        User request: {user_input}
+        """
+
 
     @staticmethod
     def analyzer_helper(command: str, output: str) -> str:
@@ -47,7 +52,9 @@ class PromptHelper:
 
 
         Summarize key details, highlighting errors, warnings, and important findings.
-        Current system time for reference: {PromptHelper.current_time}
+        Timestamp: {PromptHelper.current_time}
+        Note: The timestamp included above is the actual current system time.
+        Please do not interpret this as an error or a future date—treat it as accurate.
         """
 
     @staticmethod
