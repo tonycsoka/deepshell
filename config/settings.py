@@ -33,8 +33,10 @@ MODE_CONFIGS = {
 }
 
 #Logging
-LOGGING = True
-LOGGING_LEVEL = "info"
+LOG = True
+LOG_LEVEL = "info"
+LOG_TO_FILE = True 
+LOG_TO_UI = False
 
 #Rendering
 RENDER_DELAY = 0.01 # Delay between rendering lines
@@ -44,7 +46,7 @@ MSG_THR = 0.5 # Simularity threshold for history
 CONT_THR = 0.6 # Simularity threshold for content such as files and terminal output
 NUM_MSG = 5 # Number of messages submitted to the chatbot from history
 OFF_THR = 0.7 # Off-topic threshold
-OFF_FREQ = 4 # Off-topic checking frequency  (messages)
+OFF_FREQ = 4 # Off-topic checking frequency (messages)
 SLICE_SIZE = 4 # Last N messages to analyze for off-topic 
 
 #ShellUtils Config
@@ -53,10 +55,9 @@ MONITOR_INTERVAL = 60 # Timeout until when user will be prompted to abort comman
 FINALIZE_OUTPUT = True # Output post-processing such as trimming
 MAX_OUTPUT_LINES = 1000
 
-
 #FileProcessing Config 
 PROCESS_IMAGES = False # Turn this on if you want to get a description of the images
-IMG_INPUT_RES = (672, 672)
+IMG_INPUT_RES = (512, 512)
 
 MAX_FILE_SIZE = 6 * 1024 * 1024 #6MB
 MAX_LINES = 1000

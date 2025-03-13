@@ -1,16 +1,16 @@
 import re
 import asyncio
-from utils.logger import Logger
 from config.settings import RENDER_DELAY
 
-logger = Logger.get_logger()
-
 class Rendering:
+    _chat_app_instance = None
     def __init__(self, chat_app):
         self.chat_app = chat_app
+        Rendering._chat_app_instance = chat_app
         self.cleaner = re.compile(r'(#{3,4}|\*\*)')
         self.delay = RENDER_DELAY
         self._lock = asyncio.Lock()
+
 
     async def render_output(self, line):
         """Rendering lines while stripping away some of the markdown tags"""
@@ -30,6 +30,24 @@ class Rendering:
         
         self.chat_app.input_widget.disabled = False
         self.chat_app.input_widget.focus()
+
+
+    @staticmethod
+    async def _fancy_print(content):
+        """Render string line by line, preserving newlines and other whitespace."""
+        if not Rendering._chat_app_instance:
+            raise ValueError("ChatApp instance not set in Rendering")
+
+        chat_app = Rendering._chat_app_instance  # Accessing the chat app instance via class-level reference
+        chat_app.input_widget.disabled = True
+        lines = content.split('\n')
+
+        for line in lines:
+            await chat_app.rendering.render_output(line)
+            await asyncio.sleep(chat_app.rendering.delay)
+
+        chat_app.input_widget.disabled = False
+        chat_app.input_widget.focus()
    
     async def transfer_buffer(self, content):
         """
@@ -99,4 +117,5 @@ class Rendering:
 
         self.chat_app.input_widget.disabled = False
         self.chat_app.input_widget.focus()
+
 
