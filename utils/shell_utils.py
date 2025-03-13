@@ -50,51 +50,59 @@ class CommandExecutor:
 
    
    
-    async def run_command(self, command: str) -> str:
+    
+    async def run_command(self, command: str) -> str | None:
         if self.process is None or self.process.stdin is None or self.process.stdout is None:
             await self.start_shell()
             if self.process is None or self.process.stdin is None or self.process.stdout is None:
                 logger.error("Failed to start shell process.")
-                return "Error: Shell process could not be started." 
-        
+                return "Error: Shell process could not be started."
+
         if "sudo" in shlex.split(command):
             await self._get_sudo_password()
 
-              
-        # Build the full command with stdbuf to line-buffer the output.
-        full_command = f"stdbuf -oL {command}\n echo $?\n"
+        # Unique delimiter to detect command completion
+        delimiter = "----END-OF-COMMAND----"
+        full_command = f"stdbuf -oL {command} ; echo '{delimiter}' ; echo $?\n"
+
+        logger.debug(f"Executing: {full_command}")
         self.process.stdin.write(full_command.encode())
         await self.process.stdin.drain()
         
-        monitor_task = asyncio.create_task(self._monitor_execution(self.process))
         output_lines = []
         exit_code = None
+
         while True:
             line = await self.process.stdout.readline()
             if not line:
                 break
+
             decoded_line = line.decode(errors="ignore").strip()
-            if decoded_line.isdigit():
-                exit_code = int(decoded_line)
+
+            if decoded_line == delimiter:
+                # Read the exit code after delimiter
+                exit_code_line = await self.process.stdout.readline()
+                exit_code = int(exit_code_line.decode(errors="ignore").strip())
                 break
-            else:
-                decoded_line = self._extract_meaningful_text(decoded_line)
-            output_lines.append(decoded_line)
-        
+
+            # Skip empty lines
+            if decoded_line:
+                output_lines.append(decoded_line)
+
         result = "\n".join(output_lines).strip()
-        monitor_task.cancel()
-        
-        if exit_code == 0 and not result: 
+
+        logger.info(f"Command produced {len(output_lines)} lines")
+        logger.debug(f"Command result : {result}")
+
+        if exit_code == 0 and not result:
             logger.info("Command executed successfully with no output")
             return "pass"
+
         
         if result and self.finalize_output:
             result = await self._finalize_command_output(output_lines)
+            return result if result else f"Command failed with exit code {exit_code}"
         
-        return result if result else f"Command failed with exit code {exit_code}"
-
-
-
     async def stop_shell(self):
         """Stops the persistent shell session."""
         if self.process and self.process.returncode is None:
@@ -168,8 +176,6 @@ class CommandExecutor:
 
         logger.info("Processing command output.")
         return await self._process_command_output(proc)
-
-  
     
     async def _start_subprocess(self, command):
         """
@@ -187,7 +193,6 @@ class CommandExecutor:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-
 
     async def _process_command_output(self, proc):
         """
@@ -378,9 +383,6 @@ class CommandExecutor:
         self.sudo_password = secrets.token_urlsafe(32)
         self.sudo_password = None
         logger.info("Clearing sudo password securely.")
-
-
-
 
 
     def _is_text(self, data):
