@@ -7,6 +7,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, RichLog
 from textual.app import App, ComposeResult
 
+
 class ChatMode(App):
     _instance = None
     _initialized: bool = False
@@ -27,7 +28,6 @@ class ChatMode(App):
             self.client = manager.client
             self.rendering = Rendering(self)
             self.fancy_print = self.rendering.fancy_print
-            self.transfer_buffer = self.rendering.transfer_buffer
             self.user_input, self.file, self.file_content = user_input,file,file_content
             self.system_message = f"\nChat with: [cyan]{self.client.model}[/cyan] in [cyan]{self.client.mode.name}[/cyan] mode.\nType [red]exit[/red] or press [blue]Ctrl+C[/blue] to quit.\n\n"
 
@@ -92,6 +92,15 @@ class ChatMode(App):
             self.pswd = secrets.token_urlsafe(32)
             self.pswd = None
         self.exit()
+
+    def lock_input(self):
+        if not self.input_widget.disabled:
+            self.input_widget.disabled = True
+
+    def unlock_input(self):
+        if self.input_widget.disabled:
+            self.input_widget.disabled = False
+            self.input_widget.focus()
 
     def wait_for_input(self):
         """Helper method to wait for input asynchronously."""

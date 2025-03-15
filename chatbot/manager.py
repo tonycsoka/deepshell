@@ -115,7 +115,7 @@ class ChatManager:
             logger.info("Handling task in default mode.")
             return await self._handle_default_mode(input= user_input, history = history)
 
-    async def _handle_shell_mode(self, input, bypass=False):
+    async def _handle_shell_mode(self, input, bypass=False, no_render = False):
         """
         Handles tasks when the client is in SHELL mode.
         """
@@ -147,18 +147,21 @@ class ChatManager:
             self.client.switch_mode(Mode.SYSTEM)
             
             get_summary = asyncio.create_task(self.client._chat_stream(prompt))
-            filter_summary = asyncio.create_task(self.filtering.process_stream(False))
+            if self.ui and not no_render:
+                render = True
+            else:
+                render = False
+            filter_summary = asyncio.create_task(self.filtering.process_stream(False,render))
 
             self.tasks.append(get_summary)
             self.tasks.append(filter_summary)
             
             await self.execute_tasks()
+            self.client.switch_mode(Mode.SHELL)
 
             summary = self.client.last_response
             self.client.last_response = ""
-            if self.ui:
-                await self.ui.transfer_buffer(self.filtering.buffer) 
-            
+                       
             if self.client.keep_history and summary:
                 await self.add_terminal_output(input,output,summary)
             return summary
@@ -204,12 +207,17 @@ class ChatManager:
             logger.error("Invalid input")
             return
 
-        process_text = asyncio.create_task(filtering.process_stream(False))
+        if self.ui and not no_render:
+            rendering = True
+        else: 
+            rendering = False
+
+        process_text = asyncio.create_task(filtering.process_stream(False,rendering))
         self.tasks = [get_stream, process_text]
         
-        if self.ui and not no_render:
-            rendering_task = asyncio.create_task(self.ui.transfer_buffer(filtering.buffer))
-            self.tasks.append(rendering_task)
+        # if self.ui and not no_render:
+        #     rendering_task = asyncio.create_task(self.ui.transfer_buffer(filtering.buffer))
+        #     self.tasks.append(rendering_task)
        
         await self.execute_tasks() 
         logger.info("Default mode execution completed.")

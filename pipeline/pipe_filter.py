@@ -1,5 +1,5 @@
 import re
-import asyncio
+from ui.printer import printer
 from utils.logger import Logger
 from config.settings import Mode
 
@@ -9,77 +9,86 @@ class PipeFilter:
     def __init__(self, ollama_client):
         self.ollama_client = ollama_client
         self.input_buffer = ollama_client.output_buffer  
-        self.buffer = asyncio.Queue()
         self.formatting = ollama_client.render_output
         self.extracted_code = None
 
-    async def process_stream(self,extract_code = False):
+    
+    async def process_stream(self, extract_code=False, render=True):
         """Processes the input stream, handling thoughts and code differently based on config."""
-        full_input = "" 
+        full_input = ""
         results = ""
 
         if extract_code:
             while True:
                 message = await self.input_buffer.get()
                 if message is None:
-                  break
+                    break
                 full_input += message
 
             self.ollama_client.last_response = full_input
             self.extracted_code = await self.extract_code(response=full_input)
-
-            if self.extracted_code:
-                await self.buffer.put(self.extracted_code)
             logger.debug(f"Extracted code: {self.extracted_code}")
             return
 
         # --- Default behavior: Process thoughts and full response ---
         thinking = False
         thought_buffer = []
-        while True:
-            message = await self.input_buffer.get()
-            if message is None:
-                break  
+        accumulated_line = ""
+        first_chunk = True
 
-            full_input += message
-            output = "" 
+        while True:
+            chunk = await self.input_buffer.get()
+            if chunk is None:
+                break
+
+            output = ""
             i = 0
 
-            while i < len(message):
-                if message[i:].startswith("<think>"):
+            while i < len(chunk):
+                if chunk[i:].startswith("<think>"):
                     thinking = True
                     i += 7
                     continue
-                elif message[i:].startswith("</think>"):
+                elif chunk[i:].startswith("</think>"):
                     thinking = False
-                    i += 8  
+                    i += 8
                     if self.ollama_client.show_thinking:
-                        await self.buffer.put("\nFinal answer: ")
+                        output += "\n[blue]Final answer:[/] "
                     continue
 
+                char = chunk[i]
+
                 if thinking:
-                    thought_buffer.append(message[i])
+                    thought_buffer.append(char)
                     if self.ollama_client.show_thinking:
-                        results += message[i]
-                        await self.buffer.put(message[i])  
+                        output += char
                 else:
-                    output += message[i]
+                    output += char
 
                 i += 1
 
-            filtered_message = output
-            if filtered_message:
-                results += filtered_message
+            if output:
+                if first_chunk:
+                    output = "[green]AI: [/]" + output.lstrip("\n")
+                    first_chunk = False
 
-                await self.buffer.put(filtered_message) 
+                accumulated_line += output
 
-        # Extract thoughts after streaming
-        full_text = full_input
-        thoughts = re.findall(r"<think>(.*?)</think>", full_text, flags=re.DOTALL)
+            
+            if "\n" in accumulated_line:
+                lines = accumulated_line.split("\n")
+                for line in lines[:-1]:
+                    if line.strip() and render:
+                        printer(line)
+                accumulated_line = lines[-1]
+
+        if accumulated_line.strip() and render:
+            printer(accumulated_line)
+
         self.ollama_client.last_response = results
-        self.ollama_client.thoughts.append(thoughts)
-        logger.debug(f"PipeFilter output: {results} \nThoughts: {thoughts}")
-        await self.buffer.put(None)
+        self.ollama_client.thoughts = thought_buffer
+        logger.debug(f"PipeFilter output: {results} \nThoughts: {thought_buffer}")
+
 
     async def process_static(self, text: str, extract_code=False):
         """Processes a static string, handling thoughts and code differently based on config."""

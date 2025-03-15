@@ -34,11 +34,11 @@ MODE_CONFIGS = {
 #Logging
 LOG = True
 LOG_LEVEL = "info" #Possible values: debug, info, warning, error, critical
-LOG_TO_FILE = True 
+LOG_TO_FILE = True
 LOG_TO_UI = False
 
 #Rendering
-RENDER_DELAY = 0.01 # Delay between rendering lines
+RENDER_DELAY = 0.0069 # Delay between rendering lines
 
 #HistoryManager
 MSG_THR = 0.5 # Simularity threshold for history

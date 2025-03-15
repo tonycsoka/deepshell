@@ -1,5 +1,6 @@
 import asyncio
 from utils.logger import Logger
+from typing import AsyncGenerator, cast
 from ollama import AsyncClient, embeddings
 from config.settings import Mode, MODE_CONFIGS, EMBEDDING_MODEL
 
@@ -47,6 +48,7 @@ class OllamaClient:
         except KeyError as e:
             logger.error(f"Invalid mode: {mode}. Error: {e}")
 
+    
     async def _chat_stream(self, input=None, history=None):
         """Fetches response from the Ollama API and streams into output buffer."""
         async with OllamaClient._global_lock:
@@ -60,12 +62,15 @@ class OllamaClient:
             logger.debug(f"Chat request payload: {input}")
 
             try:
-                async for part in await self.client.chat(
+                # Force-cast the response to an AsyncGenerator
+                response = cast(AsyncGenerator[dict, None], await self.client.chat(
                     model=self.model,
                     messages=input,
                     options=self.config,
                     stream=self.stream
-                ):
+                ))
+
+                async for part in response:
                     if not self.pause_stream:
                         content = part.get('message', {}).get('content', '') 
                         await self.output_buffer.put(content)
@@ -77,6 +82,8 @@ class OllamaClient:
             except Exception as e:
                 logger.error(f"Error during chat stream: {e}")
 
+
+
     async def _describe_image(self, image: str | None):
         """Describes an image using the vision model."""
         async with OllamaClient._global_lock:
@@ -86,45 +93,34 @@ class OllamaClient:
                 logger.warning("No image provided")
                 return "No image provided"
 
-            if self.mode == Mode.VISION:
-                message = [{'role': 'user', 'content': 'Briefly describe this image', 'images': [image]}]
-
+            if self.mode == Mode.VISION: 
                 try:
-                    response = await self.client.chat(model=self.model, messages=message)
+                    response = await self.client.generate(model=self.model, prompt = image)
                     logger.debug(f"Image description response: {response}")
-
-                    message_data = response.get('message')
+                    message_data = response.response
                     if not message_data:
                         logger.warning("No message found in response")
                         return "No message in response"
-
-                    content = message_data.get('content')
-                    return content if isinstance(content, str) else "No content found"
+ 
+                    return message_data 
                 except Exception as e:
                     logger.error(f"Error while describing image: {e}")
                     return "Error processing image"
 
-    async def _fetch_response(self, input=None, history=None):
+    async def _fetch_response(self, input):
         """Fetches a complete response from the model."""
         async with OllamaClient._global_lock:
             logger.info(f"{self.mode.name} is fetching response")
 
-            if history:
-                message = history
-            else:
-                message = [{'role': 'user', 'content': input}]
-
             try:
-                response = await self.client.chat(model=self.model, messages=message)
+                response = await self.client.generate(model=self.model, prompt=input)
                 logger.info("Response received successfully")
-                message_data = response.get('message')
+                message_data = response.response
                 if not message_data:
                     logger.warning("No message found in response")
                     return "No message in response"
 
-                content = message_data.get('content')
-                return content if isinstance(content, str) else "No content found"
-
+                return message_data 
             except Exception as e:
                 logger.error(f"Error fetching response: {e}")
                 return "Error fetching response"
