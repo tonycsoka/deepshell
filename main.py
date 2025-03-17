@@ -6,7 +6,7 @@ from chatbot.manager import ChatManager
 from utils.symlink_utils import create_symlink, remove_symlink
 
 
-def main():
+async def async_main():
     args = parse_args()
     
     if args.install:
@@ -18,26 +18,30 @@ def main():
 
     chat_manager = ChatManager()
     pipe_utils = PipeUtils(chat_manager)
+
+ # Ensure queue processing starts
+
     user_input = args.prompt or args.string_input or None
     file = args.file or None
     pipe_content = None
 
-    # Determine if input or output is piped
     stdin_piped = not sys.stdin.isatty()
     stdout_piped = not sys.stdout.isatty()
 
     if stdin_piped:
-        pipe_content = asyncio.run(pipe_utils.read_pipe())
+        pipe_content = await pipe_utils.read_pipe()
     if stdout_piped:
         chat_manager.ui = None
-        asyncio.run(chat_manager.deploy_task(user_input,file,pipe_content))
+        await chat_manager.deploy_task(user_input, file, pipe_content)
         print(chat_manager.client.last_response, end="")
     else:
-        # Normal interactive mode
         if chat_manager.ui:
-            chat_manager.ui.user_input, chat_manager.ui.file, chat_manager.ui.file_content = user_input,file,pipe_content
-            chat_manager.ui.run()
+            chat_manager.ui.user_input, chat_manager.ui.file, chat_manager.ui.file_content = user_input, file, pipe_content
+            
+            # Use the async version of run()
+            await chat_manager.ui.run_async()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(async_main())  # Start event loop
+
 

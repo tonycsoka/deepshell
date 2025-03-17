@@ -4,47 +4,55 @@ from config.settings import RENDER_DELAY
 
 class Rendering:
     _chat_app_instance = None
+
     def __init__(self, chat_app):
         self.chat_app = chat_app
         Rendering._chat_app_instance = chat_app
         self.cleaner = re.compile(r'(#{3,4}|\*\*)')
         self.delay = RENDER_DELAY
         self._lock = asyncio.Lock()
+        self.queue = asyncio.Queue()
+        self._processing_task = None  # Don't start in __init__, defer it
 
+    async def start_processing(self):
+        """Start queue processing task after event loop is running."""
+        if not self._processing_task:
+            self._processing_task = asyncio.create_task(self._process_queue())
 
-    async def render_output(self, line):
-        """Rendering lines while stripping away some of the markdown tags"""
-        async with self._lock:
-            cleaned_line = self.cleaner.sub('', line.rstrip())
-            self.chat_app.rich_log_widget.write(cleaned_line)
-           
-    async def fancy_print(self, content):
-        """Render string line by line, preserving newlines and other whitespace."""
+    async def _process_queue(self):
+        """Continuously process print jobs from the queue."""
+        while True:
+            content = await self.queue.get()
+            await self._execute_fancy_print(content)
+            self.queue.task_done()
+
+    async def _execute_fancy_print(self, content):
+        """Render string line by line, preserving newlines and whitespace."""
         lines = content.split('\n')
         if len(lines) > 1:
             self.chat_app.lock_input()
-        
+
         for line in lines:
-            await self.render_output(line) 
+            await self.render_output(line)
             await asyncio.sleep(self.delay)
-        
+
         self.chat_app.unlock_input()
 
+    async def render_output(self, line):
+        """Render lines while stripping some markdown tags."""
+        async with self._lock:
+            cleaned_line = self.cleaner.sub('', line.rstrip())
+            self.chat_app.rich_log_widget.write(cleaned_line)
+
+    async def fancy_print(self, content):
+        """Add print job to queue and ensure execution order."""
+        await self.queue.put(content)
 
     @staticmethod
     async def _fancy_print(content):
-        """Render string line by line, preserving newlines and other whitespace."""
+        """Static method to enqueue print job."""
         if not Rendering._chat_app_instance:
             raise ValueError("ChatApp instance not set in Rendering")
 
-        chat_app = Rendering._chat_app_instance
-        lines = content.split('\n')
-        if len(lines) > 1:
-            chat_app.lock_input()
+        await Rendering._chat_app_instance.rendering.fancy_print(content)
 
-        for line in lines:
-            await chat_app.rendering.render_output(line)
-            await asyncio.sleep(chat_app.rendering.delay)
-
-        chat_app.unlock_input()
-   

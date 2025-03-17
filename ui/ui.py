@@ -48,6 +48,9 @@ class ChatMode(App):
         self.input_widget.styles.border = None
         self.input_widget.focus()
 
+
+        await self.rendering.start_processing() 
+
         asyncio.create_task(self.manager.init_shell())
  
         # Deploy the task with the file and user input if available
