@@ -164,7 +164,7 @@ class HistoryManager:
         await self.current_topic.add_message(role, message,embedding)
         asyncio.create_task(self._analyze_history())
  
-    async def add_file(self, file_path: str, content: str) -> None:
+    async def add_file(self, file_path: str, content: str,folder: bool = False) -> None:
         """
         Adds a file by computing its combined embedding (file path + content) 
         and routing it to the appropriate project based on the file's folder.
@@ -179,17 +179,19 @@ class HistoryManager:
                 self.projects.append(self.current_project)
                 logger.info(f"Archived project '{self.current_project.name}' to projects list.")
 
-            if await self.ui.yes_no_prompt("Do you want to generate structure for this file's folder?","No"):
-                new_project = Project(new_project_name)
-                try:
-                    folder_path = os.path.dirname(file_path)
-                    structure = self.file_utils.generate_structure(folder_path, folder_path)
-                    new_project.folder_structure = structure
-                    logger.info(f"Generated new folder structure for project '{new_project_name}'.")
-                except Exception as e:
-                    logger.error(f"Failed to generate structure for project '{new_project_name}': {e}")
-                
-                self.current_project = new_project
+
+            if not self.current_project.folder_structure and not folder:
+                if await self.ui.yes_no_prompt("Do you want to generate structure for this file's folder?","No"): 
+                    new_project = Project(new_project_name)
+                    try:
+                        folder_path = os.path.dirname(file_path)
+                        structure = self.file_utils.generate_structure(folder_path, folder_path)
+                        new_project.folder_structure = structure
+                        logger.info(f"Generated new folder structure for project '{new_project_name}'.")
+                    except Exception as e:
+                        logger.error(f"Failed to generate structure for project '{new_project_name}': {e}")
+                    
+                    self.current_project = new_project
 
         # Compute embedding for file path + content
         combined_content = f"Path: {file_path}\nContent: {content}"
@@ -288,6 +290,7 @@ class HistoryManager:
                 return candidate
         return None
  
+    
     async def get_relevant_content(self, query: str, content_type = None, top_k: int = 1, similarity_threshold: float = CONT_THR):
         """
         Retrieves relevant content (files or terminal outputs) by comparing the query
@@ -318,11 +321,13 @@ class HistoryManager:
             if file_name and info.get("type") == "file":
                 if file_name.lower() in info.get("identifier", "").lower():
                     scores.append((identifier, 1.0))
+                    logger.info(f"Added file '{identifier}' to context (Exact match on file name).")
                     continue
 
             similarity = cosine_similarity([query_embedding], [info["embedding"]])[0][0]
             if similarity >= similarity_threshold:
                 scores.append((identifier, similarity))
+                logger.info(f"Added file '{identifier}' to context (Similarity: {similarity}).")
 
         # Expand search to other projects if necessary (similar to your current logic)
         if not scores:
@@ -334,6 +339,7 @@ class HistoryManager:
                     similarity = cosine_similarity([query_embedding], [info["embedding"]])[0][0]
                     if similarity >= similarity_threshold:
                         scores.append((identifier, similarity))
+                        logger.info(f"Added file '{identifier}' from project '{project.name}' to context (Similarity: {similarity}).")
 
         if scores:
             scores.sort(key=lambda x: x[1], reverse=True)
@@ -343,13 +349,16 @@ class HistoryManager:
                 # Try to retrieve the content from the current project first.
                 if id in self.current_project.file_embeddings and "content" in self.current_project.file_embeddings[id]:
                     results.append((id, self.current_project.file_embeddings[id]["content"]))
+                    logger.info(f"Added content from file '{id}' to results.")
                 else:
-                    file_path, content = await self.current_project._read_file(id)
+                    _, content = await self.current_project._read_file(id)
                     results.append((id, content))
+                    logger.info(f"Added content from file '{id}' to results (Read from file path).")
             return results
 
-        logger.info("No matching content found")
+        logger.info("No matching content found.")
         return None
+
 
     async def fetch_embedding(self, text: str) -> np.ndarray: 
         """
@@ -463,7 +472,7 @@ class HistoryManager:
         
         prompt = f"{query}\n\n{content_references}" if content_references else query
         
-        logger.info(f"Generated prompt: {prompt}")
+        logger.debug(f"Generated prompt: {prompt}")
         await self.add_message("user", prompt, embedding)
         
         return self.current_topic.history[-num_messages:]

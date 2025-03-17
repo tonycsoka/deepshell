@@ -238,7 +238,7 @@ class FileUtils:
                 
                     content = await self.read_file(file_path)
                     if self.index_file and content:
-                        await self.index_file(file_path, content)
+                        await self.index_file(file_path, content, folder = True)
                     elif content:
                         file_contents = f"\n{content.strip()}\n"
                         if file_contents:
