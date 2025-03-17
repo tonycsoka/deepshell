@@ -65,7 +65,7 @@ class FileUtils:
         try:
             if not self._is_safe_file(file_path):
                 logger.info(f"Skipping file (unsupported): {file_path}")
-                return
+                return None
 
             # Create a lock for this file if it doesn't exist yet
             if file_path not in self.file_locks:
@@ -209,6 +209,7 @@ class FileUtils:
         logger.debug(f"Folder structure: {structure}")
         return structure
    
+
     async def read_folder(self, folder_path, root_folder=None):
         """Recursively scans and reads all files in a folder.
            The folder structure is generated for all files; however, only files with safe extensions
@@ -220,30 +221,32 @@ class FileUtils:
         if root_folder is None:
             root_folder = folder_path
 
+        all_contents = []  # To collect content from all files
+
         try:
             await self._print_message(f"Generating structure for {folder_path}")
-            generated_structure = self.generate_structure(folder_path,root_folder)
+            generated_structure = self.generate_structure(folder_path, root_folder)
             if self.add_folder:
                 self.add_folder(generated_structure)
-                        # Collecting content of all files
+
+            # Collecting content of all files
             for root, _, files in os.walk(folder_path):
                 if any(ignored in root.split(os.sep) for ignored in self.ignore_folders):
                     continue
                 for file in files:
                     file_path = os.path.join(root, file)
-                    if not any(file.lower().endswith(ext) for ext in self.safe_extensions):
-                        logger.info( f"Skipping file (unsupported): {file_path}\n")
-                    else:
-                        content = await self.read_file(file_path)
-                        if self.index_file and content:
-                            await self.index_file(file_path, content)
-                        elif content:
-                            file_contents = f"\n{content.strip()}\n"
-                            if file_contents:
-                                return file_contents
-                        
+                
+                    content = await self.read_file(file_path)
+                    if self.index_file and content:
+                        await self.index_file(file_path, content)
+                    elif content:
+                        file_contents = f"\n{content.strip()}\n"
+                        if file_contents:
+                            all_contents.append(file_contents)
 
             logger.info(f"Reading files in {folder_path} complete")
+
+            return "\n".join(all_contents)
 
         except PermissionError:
             logger.error(f"Error: Permission denied to access '{folder_path}'.")
