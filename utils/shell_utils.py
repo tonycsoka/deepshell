@@ -46,10 +46,7 @@ class CommandExecutor:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            logger.info("Started persistent shell session.")
-
-   
-   
+            logger.info("Started persistent shell session.") 
     
     async def run_command(self, command: str) -> str | None:
         if self.process is None or self.process.stdin is None or self.process.stdout is None:
@@ -63,7 +60,7 @@ class CommandExecutor:
 
         # Unique delimiter to detect command completion
         delimiter = "----END-OF-COMMAND----"
-        full_command = f"stdbuf -oL {command} ; echo '{delimiter}' ; echo $?\n"
+        full_command = f"{command} ; echo '{delimiter}' ; echo $?\n"
 
         logger.debug(f"Executing: {full_command}")
         self.process.stdin.write(full_command.encode())
