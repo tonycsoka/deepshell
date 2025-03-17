@@ -1,5 +1,4 @@
 import asyncio
-from asyncio.tasks import create_task
 from ui.ui import ChatMode
 from utils.logger import Logger
 from config.settings import Mode
@@ -134,37 +133,48 @@ class ChatManager:
         
         if output and input:
             logger.info("Command executed, processing output.")
-            if self.ui:
-                system_message = "[cyan]System:[/] Output submitted to the chatbot for analysis..."         
+            if self.ui:        
 
                 await self.ui.fancy_print(f"[cyan]System:[/] Executing [green]'{input}'[/]")
                
                 if await self.ui.yes_no_prompt("Do you want to see the output?", default="No"):
-                   render_task = asyncio.create_task(self.ui.fancy_print(f"\n[blue]Shell output[/]:\n{output}\n\n{system_message}\n"))
+                   render_task = asyncio.create_task(self.ui.fancy_print(f"[blue]Shell output[/]:\n{output}"))
                    self.tasks.append(render_task)
+                await asyncio.sleep(0.1)
+                if await self.ui.yes_no_prompt("Analyze the output?", default="Yes"):
+                    if len(self.tasks) != 0:
+        
+                        asyncio.create_task(self.execute_tasks())
+                    await self.ui.fancy_print("[cyan]System:[/] Output submitted to the chatbot for analysis...")
 
-            prompt = PromptHelper.analyzer_helper(input, output)
-            self.client.switch_mode(Mode.SYSTEM)
-            
-            get_summary = asyncio.create_task(self.client._chat_stream(prompt))
-            if self.ui and not no_render:
-                render = True
-            else:
-                render = False
-            filter_summary = asyncio.create_task(self.filtering.process_stream(False,render))
+                    prompt = PromptHelper.analyzer_helper(input, output)
+                    self.client.switch_mode(Mode.SYSTEM)
+                    
+                    get_summary = asyncio.create_task(self.client._chat_stream(prompt))
+                    if not no_render:
+                        render = True
+                    else:
+                        render = False
+                    filter_summary = asyncio.create_task(self.filtering.process_stream(False,render != no_render))
 
-            self.tasks.append(get_summary)
-            self.tasks.append(filter_summary)
-            
-            await self.execute_tasks()
-            self.client.switch_mode(Mode.SHELL)
+                    self.tasks.append(get_summary)
+                    self.tasks.append(filter_summary)
+                    
+                    await self.execute_tasks()
+                   
 
-            summary = self.client.last_response
-            self.client.last_response = ""
-                       
-            if self.client.keep_history and summary:
-                await self.add_terminal_output(input,output,summary)
-            return summary
+                                                 
+                    if self.client.keep_history and self.client.last_response:
+                        await self.add_terminal_output(input,output,self.client.last_response)
+                    self.client.switch_mode(Mode.SHELL)
+                    return self.client.last_response
+
+                else:
+                    if len(self.tasks) != 0:
+                        await self.execute_tasks()
+                    if self.client.keep_history:
+                        await self.add_terminal_output(input,output,"")
+                    return output
 
         else:
             logger.warning("No output detected.")

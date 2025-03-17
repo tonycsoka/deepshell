@@ -71,7 +71,7 @@ class PipeFilter:
                 if first_chunk:
                     output = "[green]AI: [/]" + output.lstrip("\n")
                     first_chunk = False
-
+                results += output
                 accumulated_line += output
 
             
