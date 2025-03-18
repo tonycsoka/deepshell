@@ -21,7 +21,7 @@ class ChatManager:
 
         self.ui = ChatMode(self) if self.client.render_output else None
         self.last_mode = None
-                
+
         self.command_processor = CommandProcessor(self)
         self.file_utils = self.command_processor.file_utils
         self.executor = self.command_processor.executor
@@ -31,104 +31,60 @@ class ChatManager:
         self.add_terminal_output = self.history_manager.add_terminal_output
         self.generate_prompt = self.history_manager.generate_prompt
 
-        self.file_utils.set_index_functions(self.history_manager.add_file,self.history_manager.add_folder_structure)
+        self.file_utils.set_index_functions(
+            self.history_manager.add_file,
+            self.history_manager.add_folder_structure
+        )
 
         self.tasks = []
-
+        # Unified queue for heavy chatbot processing calls.
         self.task_queue = asyncio.Queue()
         self.worker_running = False  # Flag to track worker status
 
-        # Start task processing loop
+        # Start the heavy-task worker loop.
         asyncio.create_task(self.task_worker())
-        
+
     async def init_shell(self):
         """
-        Helper functon to initialize shell session.
+        Helper function to initialize shell session.
         """
         await self.executor.start_shell()
 
     async def stop_shell(self):
         """
-        Helper functon to stop the shell session.
+        Helper function to stop the shell session.
         """
         await self.executor.stop_shell()
-       
+
     async def deploy_task(self, user_input=None, file_name=None, file_content=None):
         """
-        Enqueues a task instead of executing it immediately.
+        Deploys a task based on user input and file content.
         """
-        queue_size_before = self.task_queue.qsize()
-        logger.info(f"Task enqueued. Queue size before: {queue_size_before}")
-
-        await self.task_queue.put((user_input, file_name, file_content))
-
-        queue_size_after = self.task_queue.qsize()
-        logger.info(f"Task successfully added. Queue size after: {queue_size_after}")
-
-        # Ensure worker is running
-        if not self.worker_running:
-            logger.info("Starting task worker.")
-            asyncio.create_task(self.task_worker())
-
-    async def task_worker(self):
-        """
-        Processes tasks from the queue sequentially.
-        """
-        if self.worker_running:
-            logger.info("Task worker already running.")
-            return  # Ensure only one worker runs at a time
-        
-        self.worker_running = True
-        logger.info("Task worker started.")
-
-        while not self.task_queue.empty():
-            queue_size_before = self.task_queue.qsize()
-            user_input, file_name, file_content = await self.task_queue.get()
-            
-            logger.info(f"Processing task. Queue size before execution: {queue_size_before}")
-            start_time = time.time()
-
-            await self._process_task(user_input, file_name, file_content)
-
-            end_time = time.time()
-            execution_time = end_time - start_time
-            queue_size_after = self.task_queue.qsize()
-
-            logger.info(f"Task completed in {execution_time:.2f} seconds. Queue size after execution: {queue_size_after}")
-            self.task_queue.task_done()
-
-        logger.info("No more tasks. Task worker is going idle.")
-        self.worker_running = False
-
-    async def _process_task(self, user_input, file_name, file_content):
-        """
-        Processes a single task.
-        """
-        logger.info("Processing task.")
-
+        logger.info("Deploy task started.")
         response = None
         self.last_mode = self.client.mode
 
         if file_name:
-            logger.info(f"Processing file: {file_name}")
+            logger.info("Processing file: %s", file_name)
             await self.file_utils.process_file_or_folder(file_name)
             if not user_input:
                 user_input = "Analyze this content"
-
         elif file_content:
             logger.info("Pipe input detected.")
             if not user_input:
                 user_input = f"Analyze this: {file_content}"
             else:
                 user_input = f"{user_input} Content: {file_content}"
-
         else:
             logger.info("No file content, processing user input.")
             user_input = await self.command_processor.handle_command(user_input)
 
-        user_input, bypass_flag = (user_input if isinstance(user_input, tuple) else (user_input, False))
+        user_input, bypass_flag = (
+            user_input if isinstance(user_input, tuple) else (user_input, False)
+        )
 
         logger.info("Executing task manager.")
+
         if bypass_flag or self.client.mode != Mode.DEFAULT:
             response = await self.task_manager(user_input=user_input, bypass=bypass_flag)
             if not response:
@@ -145,22 +101,75 @@ class ChatManager:
         if self.client.mode != self.last_mode:
             self.client.switch_mode(self.last_mode)
 
-        logger.info("Task processing completed.")
+        logger.info("Deploy task completed.")
+        return response
+
+    async def deploy_chatbot_method(self, coro_func, *args, **kwargs):
+        """
+        Enqueue a heavy chatbot processing call (e.g. _chat_stream, _fetch_response,
+        process_static, _describe_image, etc.) and return its result.
+        """
+        future = asyncio.get_running_loop().create_future()
+        await self.task_queue.put((coro_func, args, kwargs, future))
+        if not self.worker_running:
+            logger.info("Starting task worker from deploy_chatbot_method.")
+            asyncio.create_task(self.task_worker())
+        return await future
+
+    async def task_worker(self):
+        """
+        Processes tasks from the unified queue sequentially.
+        Distinguishes heavy processing calls (tuples of 4 elements) and logs execution times
+        and queue sizes.
+        """
+        if self.worker_running:
+            logger.info("Task worker already running.")
+            return
+        self.worker_running = True
+        logger.info("Task worker started.")
+
+        while not self.task_queue.empty():
+            queue_size_before = self.task_queue.qsize()
+            start_time = time.time()
+            task = await self.task_queue.get()
+
+            # Heavy chatbot processing call: (coro_func, args, kwargs, future)
+            if len(task) == 4:
+                coro_func, args, kwargs, future = task
+                try:
+                    result = await coro_func(*args, **kwargs)
+                    future.set_result(result)
+                except Exception as e:
+                    logger.error("Chatbot task error: %s", e)
+                    future.set_exception(e)
+            else:
+                # In case legacy tasks are ever added to this queue.
+                logger.warning("Encountered legacy task in heavy task queue. Skipping.")
+
+            end_time = time.time()
+            execution_time = end_time - start_time
+            queue_size_after = self.task_queue.qsize()
+            logger.info("Task completed in %.2f seconds. Queue size before: %d, after: %d",
+                        execution_time, queue_size_before, queue_size_after)
+            self.task_queue.task_done()
+
+        logger.info("No more tasks. Task worker is going idle.")
+        self.worker_running = False
 
     async def task_manager(self, user_input=None, history=None, bypass=None):
         """
         Manages tasks based on the client's mode.
         """
-        logger.info(f"Task manager started in mode: {self.client.mode}. Current queue size: {self.task_queue.qsize()}")
+        logger.info("Task manager started in mode: %s", self.client.mode)
 
-        shell_bypass = bypass == "shell"
+        shell_bypass = True if bypass == "shell" else False
         if bypass is None:
             bypass = ""
 
         mode_handlers = {
-            Mode.SHELL: lambda input: self._handle_shell_mode(input, shell_bypass),
+            Mode.SHELL: lambda inp: self._handle_shell_mode(inp, shell_bypass),
             Mode.CODE: self._handle_code_mode,
-            Mode.VISION: lambda user_input: self._handle_vision_mode(bypass, user_input),
+            Mode.VISION: lambda inp: self._handle_vision_mode(bypass, inp),
         }
 
         if shell_bypass:
@@ -168,24 +177,41 @@ class ChatManager:
             return await self._handle_shell_mode(user_input, True)
 
         if self.client.mode in mode_handlers:
-            logger.info(f"Handling task in mode: {self.client.mode}")
+            logger.info("Handling task in mode: %s", self.client.mode)
             return await mode_handlers[self.client.mode](user_input)
         else:
             logger.info("Handling task in default mode.")
             return await self._handle_default_mode(input=user_input, history=history)
 
-    async def _handle_vision_mode(self,target, user_input,no_render = False):
+
+    async def _handle_helper_mode(self, input,strip_json = False):
+        if self.client.mode != Mode.HELPER:
+            self.client.switch_mode(Mode.HELPER)
+
+        response = await self.deploy_chatbot_method(self.client._fetch_response, input)
+        if strip_json:
+            response = response.strip("`").strip("json")
+
+        filtered_response = await self.deploy_chatbot_method(self.filtering.process_static, response)
+
+        if self.last_mode:
+            self.client.switch_mode(self.last_mode)
+        return filtered_response
+
+    async def _handle_vision_mode(self, target, user_input, no_render=False):
         """
-        Handles vision mode, providing description of the image.
+        Handles vision mode by generating an image description.
+        The heavy call to describe the image is offloaded.
         """
         if PROCESS_IMAGES:
             if self.client.mode != Mode.VISION:
                 self.client.switch_mode(Mode.VISION)
-            
-            logger.info(f"Generating description for {target}")
-
+            logger.info("Processing image %s", target)
             encoded_image = await self.file_utils._process_image(target)
-            description =  await self.client._describe_image(image = encoded_image,prompt = user_input)
+            description = await self.deploy_chatbot_method(
+                self.client._describe_image, image=encoded_image, prompt=user_input
+            )
+            logger.info("Processed image %s", target)
             if self.last_mode:
                 self.client.switch_mode(self.last_mode)
             if self.ui and not no_render:
@@ -193,131 +219,114 @@ class ChatManager:
             return f"Image description by the vision model: {description}"
         else:
             if self.ui:
-                await self.ui.fancy_print("[cyan]System: [/]Image processing is disabled, check your settings.py")
+                await self.ui.fancy_print("[cyan]System:[/]Image processing is disabled, check your settings.py")
             logger.warning("Image processing is disabled")
             return None
 
-    async def _handle_shell_mode(self, input, bypass=False, no_render = False):
+    async def _handle_shell_mode(self, input, bypass=False, no_render=False):
         """
         Handles tasks when the client is in SHELL mode.
+        Command execution is performed immediately, while heavy processing (code conversion
+        and output analysis) is offloaded.
         """
         logger.info("Shell mode execution started. Bypass: %s", bypass)
-        
         if not bypass:
-            input = await self._handle_code_mode(PromptHelper.shell_helper(input), no_render=True)
-            input, output = await self.executor.start(input)
+            code_input = await self._handle_code_mode(PromptHelper.shell_helper(input), no_render=True)
+            input, output = await self.executor.start(code_input)
         else:
             output = await self.executor.run_command(input)
 
         if output == "pass":
             if self.ui:
-                await self.ui.fancy_print("[cyan]System:[/] command executed successfully")
+                await self.ui.fancy_print("[cyan]System:[/] Command executed successfully")
             return "pass"
-        
+
         if output and input:
             logger.info("Command executed, processing output.")
-            if self.ui:        
-
+            if self.ui:
                 await self.ui.fancy_print(f"[cyan]System:[/] Executing [green]'{input}'[/]")
-               
                 if await self.ui.yes_no_prompt("Do you want to see the output?", default="No"):
-                   render_task = asyncio.create_task(self.ui.fancy_print(f"[blue]Shell output[/]:\n{output}"))
-                   self.tasks.append(render_task)
+                    render_task = asyncio.create_task(self.ui.fancy_print(f"[blue]Shell output[/]:\n{output}"))
+                    self.tasks.append(render_task)
                 await asyncio.sleep(0.1)
                 if await self.ui.yes_no_prompt("Analyze the output?", default="Yes"):
-                    if len(self.tasks) != 0:
-        
+                    if self.tasks:
                         asyncio.create_task(self.execute_tasks())
                     await self.ui.fancy_print("[cyan]System:[/] Output submitted to the chatbot for analysis...")
-
                     prompt = PromptHelper.analyzer_helper(input, output)
                     self.client.switch_mode(Mode.SYSTEM)
-                    
-                    get_summary = asyncio.create_task(self.client._chat_stream(prompt))
-                    if not no_render:
-                        render = True
-                    else:
-                        render = False
-                    filter_summary = asyncio.create_task(self.filtering.process_stream(False,render != no_render))
-
-                    self.tasks.append(get_summary)
-                    self.tasks.append(filter_summary)
-                    
-                    await self.execute_tasks()
-                   
-
-                                                 
+                    get_summary = self.deploy_chatbot_method(self.client._chat_stream, prompt)
+                    filter_summary = self.deploy_chatbot_method(self.filtering.process_stream, False, render=not no_render)
+                    await asyncio.gather(get_summary, filter_summary)
                     if self.client.keep_history and self.client.last_response:
-                        await self.add_terminal_output(input,output,self.client.last_response)
+                        await self.add_terminal_output(input, output, self.client.last_response)
                     self.client.switch_mode(Mode.SHELL)
                     return self.client.last_response
-
                 else:
-                    if len(self.tasks) != 0:
-                        await self.execute_tasks()
+                    if self.tasks:
+                        await asyncio.gather(*self.tasks)
                     if self.client.keep_history:
-                        await self.add_terminal_output(input,output,"")
+                        await self.add_terminal_output(input, output, "")
                     return output
-
         else:
             logger.warning("No output detected.")
             if self.ui:
                 await self.ui.fancy_print("\nNo output detected...\n")
-        
+
         self.client.last_response = ""
         self.filtering.extracted_code = ""
-
         logger.info("Shell mode execution completed.")
+        return output
 
     async def _handle_code_mode(self, input, no_render=False):
         """
         Handles tasks when the client is in CODE mode.
+        Heavy processing (fetching response and static processing) is offloaded.
         """
         logger.info("Code mode execution started.")
-       
-        response = await self.client._fetch_response(input)
-        code = await self.filtering.process_static(response,True)
-
+        response = await self.deploy_chatbot_method(self.client._fetch_response, input)
+        code = await self.deploy_chatbot_method(self.filtering.process_static, response, True)
         if code:
             if self.ui and not no_render:
                 await self.ui.fancy_print(code)
             return code
 
-    async def _handle_default_mode(self, input= None, history = None, no_render=False):
+    async def _handle_default_mode(self, input=None, history=None, no_render=False):
         """
         Handles tasks when the client is in the default mode.
+        Streaming and filtering are queued together as one job and passed to deploy_chatbot.
         """
         logger.info("Default mode execution started.")
 
         client = self.client
         filtering = self.filtering
+
         if history and not input:
-            get_stream = asyncio.create_task(client._chat_stream(history = history))
-            logger.info("Passing the history to the chatbot")
+            logger.info("Using chat history.")
+            chat_task = client._chat_stream(history=history)
         elif input and not history:
-            get_stream = asyncio.create_task(client._chat_stream(input))
+            logger.info("Using user input.")
+            chat_task = client._chat_stream(input)
         else:
-            logger.error("Invalid input")
+            logger.error("Invalid input.")
             return
 
-        if self.ui and not no_render:
-            rendering = True
-        else: 
-            rendering = False
+        # Decide whether to render output
+        rendering = True if self.ui and not no_render else False
+        filter_task = filtering.process_stream(False, render=rendering)
 
-        process_text = asyncio.create_task(filtering.process_stream(False,rendering))
-        self.tasks = [get_stream, process_text]
-         
-        await self.execute_tasks() 
-        logger.info("Default mode execution completed.")
+        # Create a single async job for both tasks
+        async def streaming_job():
+            await asyncio.gather(chat_task, filter_task)
 
-        return client.last_response
+        # Pass the job to deploy_chatbot_method
+        return await self.deploy_chatbot_method(streaming_job)
+
 
     async def execute_tasks(self):
         try:
             await asyncio.gather(*self.tasks, return_exceptions=True)
         except Exception as e:
-            logger.error(f"Error in default mode execution: {e}")
-
+            logger.error("Error in default mode execution: %s", e)
         self.tasks = []
 

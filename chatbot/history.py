@@ -6,15 +6,11 @@ import numpy as np
 from datetime import datetime
 from utils.logger import Logger
 from chatbot.helper import PromptHelper
-from chatbot.deployer import ChatBotDeployer
 from ollama_client.api_client import OllamaClient
 from sklearn.metrics.pairwise import cosine_similarity
-from config.settings import Mode, OFF_THR, MSG_THR, CONT_THR, NUM_MSG, OFF_FREQ, SLICE_SIZE 
-
+from config.settings import OFF_THR, MSG_THR, CONT_THR, NUM_MSG, OFF_FREQ, SLICE_SIZE 
 
 logger = Logger.get_logger()
-
-helper, filter_helper = ChatBotDeployer.deploy_chatbot(Mode.HELPER)
 
 class Project:
 
@@ -138,6 +134,8 @@ class HistoryManager:
             similarity_threshold (float): Threshold for determining similarity.
         """
         self.file_utils = manager.file_utils
+        self.helper = manager._handle_helper_mode
+        self.tasker = manager.deploy_chatbot_method
         self.ui = manager.ui
         self.similarity_threshold = MSG_THR
         self.topics: list[Topic] = []
@@ -369,7 +367,7 @@ class HistoryManager:
             if text in self.embedding_cache:
                 return self.embedding_cache[text]
 
-        embedding = await OllamaClient.fetch_embedding(text)
+        embedding = await self.tasker(OllamaClient.fetch_embedding, text)
         if embedding:
             self.embedding_cache[text] = embedding
             logger.debug(f"Extracted {len(embedding)} embeddings")
@@ -493,17 +491,12 @@ class HistoryManager:
         extracted_topic_description = None
 
         while attempt < max_retries:
+            await asyncio.sleep(1)
             try:
-                response = await helper._fetch_response(PromptHelper.topics_helper(history))
-                response = response.strip("`").strip("json")
+                response = await self.helper(PromptHelper.topics_helper(history),True)
                 if not response:
-                    raise ValueError("Received empty response from the helper.")
+                    logger.warning("Received empty response from the helper.")
                 
-                await filter_helper.process_static(response)
-                response = helper.last_response
-                if not response:
-                    raise ValueError("Response empty after filtering.")
-
                 logger.debug(f"Extracting topic info from response: {response}")
                 clean_response = re.sub(r"^```|```$|json", "", response, flags=re.IGNORECASE).strip()
                 matches = re.findall(r':\s*"([^"]+)"', clean_response)
@@ -514,14 +507,14 @@ class HistoryManager:
                     logger.info(f"Extracted topic: {extracted_topic_name}")
                     return extracted_topic_name, extracted_topic_description
                 else:
-                    raise ValueError("Could not extract valid topic information.")
+                    logger.warning("Could not extract valid topic information.")
             except Exception as e:
                 logger.error(f"Analyze history attempt {attempt + 1} failed: {str(e)}", exc_info=True)
                 attempt += 1
                 if attempt < max_retries:
                     logger.info(f"Retrying analysis... (Attempt {attempt + 1} of {max_retries})")
                 else:
-                    logger.warning("Max analysis retries reached; not splitting unsorted history.")
+                    logger.error("Max analysis retries reached; not splitting unsorted history.")
                     break
         return None, None
 
