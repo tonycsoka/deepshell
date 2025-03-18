@@ -62,7 +62,8 @@ class ChatManager:
         """
         logger.info("Deploy task started.")
         response = None
-        self.last_mode = self.client.mode
+        if self.client.mode != Mode.VISION:
+            self.last_mode = self.client.mode
 
         if file_name:
             logger.info("Processing file: %s", file_name)
