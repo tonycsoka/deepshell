@@ -1,6 +1,5 @@
 import sys
 import asyncio
-import secrets
 from textual import events
 from ui.rendering import Rendering
 from textual.containers import Vertical
@@ -23,7 +22,6 @@ class ChatMode(App):
             super().__init__() 
             if self._initialized:
                 return
-            self.pswd = None
             self.manager = manager
             self.client = manager.client
             self.rendering = Rendering(self)
@@ -91,9 +89,7 @@ class ChatMode(App):
 
     async def exit_app(self):
         await self.manager.stop_shell()
-        if self.pswd:
-            self.pswd = secrets.token_urlsafe(32)
-            self.pswd = None
+
         self.exit()
 
     def lock_input(self):

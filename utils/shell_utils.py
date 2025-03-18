@@ -32,8 +32,8 @@ class CommandExecutor:
         self.finalize_output = FINALIZE_OUTPUT
         self.shell_type = SHELL_TYPE
         self.process: asyncio.subprocess.Process | None = None
-        if self.ui:
-            self.sudo_password = self.ui.pswd
+        
+        self.sudo_password = False
 
 
     async def start_shell(self):
@@ -157,14 +157,14 @@ class CommandExecutor:
        
         require_sudo = True if "sudo" in shlex.split(command) else False
 
-        if require_sudo:
-            if not self.sudo_password:
-                logger.info("Requesting sudo password.")
-                await self._get_sudo_password()
-            if not self.sudo_password:
+        if require_sudo: 
+            logger.info("Requesting sudo password.")
+            sudo_password = await self._get_sudo_password(return_password=True)
+            if not sudo_password:
                 logger.warning("Sudo password not provided.")
                 return None
-            command = f"echo {self.sudo_password} | sudo -S {command[5:]}"
+            command = f"echo {sudo_password} | sudo -S {command[5:]}"
+            sudo_password = None
 
         proc = await self._start_subprocess(command)
         if proc is None:
@@ -297,49 +297,55 @@ class CommandExecutor:
             output_lines = output_lines[:self.max_output_lines] + ["[Output truncated]"]
 
         output_str = "\n".join(output_lines) 
-        self._clear_sudo_password()
+      
         logger.info("Command execution completed.")
         
         return output_str
 
-    async def _get_sudo_password(self):
+    async def _get_sudo_password(self,return_password = False):
         """
         Prompts the user for a sudo password if not already provided.
-        Validates the password before storing it.
+        If the password was previously validated, revalidate sudo without a password.
         """
-        if self.ui and hasattr(self.ui, 'pswd') and self.ui.pswd:
-            self.sudo_password = self.ui.pswd
-        else:
-            self.sudo_password = await self._get_user_input("Enter sudo password: ", is_password=True)
-            if self.sudo_password:
-                valid = await self._validate_sudo_password(self.sudo_password)
-                if valid:
-                    if self.ui:
-                        self.ui.pswd = self.sudo_password
-                    return self.sudo_password
-                else:
-                    if self.ui:
-                        self.ui.pswd = None
-                    self.sudo_password = None
-                    await self._print_message("Wrong password")
-                    logger.warning("Wrong sudo password")
-                    return None
+        if self.sudo_password:
+            if await self._validate_sudo_password(None):
+                return
+            else:
+                self.sudo_password = None
+                logger.warning("Sudo session expired, password required again.")
 
-    
+        # Prompt for a new password
+        sudo_password = await self._get_user_input("Enter sudo password: ", is_password=True)
+        if sudo_password:
+            valid = await self._validate_sudo_password(sudo_password)
+            if valid:
+                if return_password:
+                    return sudo_password
+                self.sudo_password = True
+                sudo_password = None
+                logger.info("Sudo password validated and cleared securely.")
+            else:
+                await self._print_message("Wrong password")
+                logger.warning("Wrong sudo password")
+
+
     async def _validate_sudo_password(self, sudo_password):
         """
-        Validates the provided sudo password.
-        
+        Validates the provided sudo password or checks if sudo is still active.
+
         Args:
-            sudo_password (str): The sudo password to validate.
-        
+            sudo_password (str or None): The sudo password to validate, or None to check active status.
+
         Returns:
             bool: True if valid, False otherwise.
         """
-        command = f"echo {sudo_password} | sudo -S -v"
-        
-        # If we have an existing persistent shell with valid stdin and stdout, use it.
-        if self.process is not None and self.process.stdin is not None and self.process.stdout is not None:
+        if sudo_password:
+            command = f"echo {sudo_password} | sudo -S -v"
+        else:
+            # Check if sudo session is still active
+            command = "sudo -n true"
+
+        if self.process and self.process.stdin and self.process.stdout:
             full_command = f"stdbuf -oL {command}\n echo $?\n"
             self.process.stdin.write(full_command.encode())
             await self.process.stdin.drain()
@@ -350,37 +356,21 @@ class CommandExecutor:
                 if not line:
                     break
                 decoded_line = line.decode(errors="ignore").strip()
-                # Assume the exit code is output as a standalone digit.
                 if decoded_line.isdigit():
                     exit_code = int(decoded_line)
                     break
             proc_valid = (exit_code == 0)
         else:
-            # Fall back to spawning a new subprocess.
             proc = await self._start_subprocess(command)
-            # Wait for the process to complete.
             await proc.communicate()
             proc_valid = (proc.returncode == 0)
 
         if proc_valid:
-            logger.info("Sudo password validated.")
-            # Overwrite and clear the password for security.
-            sudo_password = secrets.token_urlsafe(32)
-            sudo_password = None
+            logger.info("Sudo session validated.")
             return True
         else:
-            logger.warning("Invalid sudo password.")
+            logger.warning("Sudo validation failed.")
             return False
-
-    def _clear_sudo_password(self):
-        """
-        Clears the stored sudo password securely by overwriting it before setting 
-        it to None.
-        """
-        self.sudo_password = secrets.token_urlsafe(32)
-        self.sudo_password = None
-        logger.info("Clearing sudo password securely.")
-
 
     def _is_text(self, data):
         """
