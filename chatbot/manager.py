@@ -1,3 +1,4 @@
+import time
 import asyncio
 from ui.ui import ChatMode
 from utils.logger import Logger
@@ -33,6 +34,12 @@ class ChatManager:
         self.file_utils.set_index_functions(self.history_manager.add_file,self.history_manager.add_folder_structure)
 
         self.tasks = []
+
+        self.task_queue = asyncio.Queue()
+        self.worker_running = False  # Flag to track worker status
+
+        # Start task processing loop
+        asyncio.create_task(self.task_worker())
         
     async def init_shell(self):
         """
@@ -48,18 +55,66 @@ class ChatManager:
        
     async def deploy_task(self, user_input=None, file_name=None, file_content=None):
         """
-        Deploys a task based on user input and file content.
+        Enqueues a task instead of executing it immediately.
         """
-        logger.info("Deploy task started.")
+        queue_size_before = self.task_queue.qsize()
+        logger.info(f"Task enqueued. Queue size before: {queue_size_before}")
+
+        await self.task_queue.put((user_input, file_name, file_content))
+
+        queue_size_after = self.task_queue.qsize()
+        logger.info(f"Task successfully added. Queue size after: {queue_size_after}")
+
+        # Ensure worker is running
+        if not self.worker_running:
+            logger.info("Starting task worker.")
+            asyncio.create_task(self.task_worker())
+
+    async def task_worker(self):
+        """
+        Processes tasks from the queue sequentially.
+        """
+        if self.worker_running:
+            logger.info("Task worker already running.")
+            return  # Ensure only one worker runs at a time
+        
+        self.worker_running = True
+        logger.info("Task worker started.")
+
+        while not self.task_queue.empty():
+            queue_size_before = self.task_queue.qsize()
+            user_input, file_name, file_content = await self.task_queue.get()
+            
+            logger.info(f"Processing task. Queue size before execution: {queue_size_before}")
+            start_time = time.time()
+
+            await self._process_task(user_input, file_name, file_content)
+
+            end_time = time.time()
+            execution_time = end_time - start_time
+            queue_size_after = self.task_queue.qsize()
+
+            logger.info(f"Task completed in {execution_time:.2f} seconds. Queue size after execution: {queue_size_after}")
+            self.task_queue.task_done()
+
+        logger.info("No more tasks. Task worker is going idle.")
+        self.worker_running = False
+
+    async def _process_task(self, user_input, file_name, file_content):
+        """
+        Processes a single task.
+        """
+        logger.info("Processing task.")
+
         response = None
         self.last_mode = self.client.mode
-        
+
         if file_name:
-            logger.info("Processing file: %s", file_name)
+            logger.info(f"Processing file: {file_name}")
             await self.file_utils.process_file_or_folder(file_name)
             if not user_input:
-                user_input = f"Analyze this content"
-        
+                user_input = "Analyze this content"
+
         elif file_content:
             logger.info("Pipe input detected.")
             if not user_input:
@@ -72,16 +127,14 @@ class ChatManager:
             user_input = await self.command_processor.handle_command(user_input)
 
         user_input, bypass_flag = (user_input if isinstance(user_input, tuple) else (user_input, False))
-          
+
         logger.info("Executing task manager.")
-
         if bypass_flag or self.client.mode != Mode.DEFAULT:
-
-            response = await self.task_manager(user_input = user_input,bypass = bypass_flag)
+            response = await self.task_manager(user_input=user_input, bypass=bypass_flag)
             if not response:
                 logger.info("No response detected")
                 return
-        
+
         if self.client.keep_history and self.client.mode != Mode.SHELL and not response:
             history = await self.generate_prompt(user_input)
             response = await self.task_manager(history=history)
@@ -92,37 +145,34 @@ class ChatManager:
         if self.client.mode != self.last_mode:
             self.client.switch_mode(self.last_mode)
 
-        logger.info("Deploy task completed.")
-        return response
+        logger.info("Task processing completed.")
 
-
-    async def task_manager(self, user_input = None, history = None, bypass = None):
+    async def task_manager(self, user_input=None, history=None, bypass=None):
         """
         Manages tasks based on the client's mode.
         """
-        logger.info("Task manager started in mode: %s", self.client.mode)
+        logger.info(f"Task manager started in mode: {self.client.mode}. Current queue size: {self.task_queue.qsize()}")
 
-        shell_bypass = True if bypass == "shell" else False
-
-        if bypass == None:
+        shell_bypass = bypass == "shell"
+        if bypass is None:
             bypass = ""
 
         mode_handlers = {
             Mode.SHELL: lambda input: self._handle_shell_mode(input, shell_bypass),
             Mode.CODE: self._handle_code_mode,
-            Mode.VISION: lambda user_input: self._handle_vision_mode(bypass,user_input),
+            Mode.VISION: lambda user_input: self._handle_vision_mode(bypass, user_input),
         }
-        
+
         if shell_bypass:
             logger.info("Bypassing mode, executing shell mode.")
             return await self._handle_shell_mode(user_input, True)
-        
+
         if self.client.mode in mode_handlers:
-            logger.info("Handling task in mode: %s", self.client.mode)
+            logger.info(f"Handling task in mode: {self.client.mode}")
             return await mode_handlers[self.client.mode](user_input)
         else:
             logger.info("Handling task in default mode.")
-            return await self._handle_default_mode(input= user_input, history = history)
+            return await self._handle_default_mode(input=user_input, history=history)
 
     async def _handle_vision_mode(self,target, user_input,no_render = False):
         """
@@ -132,11 +182,10 @@ class ChatManager:
             if self.client.mode != Mode.VISION:
                 self.client.switch_mode(Mode.VISION)
             
-            logger.info(f"Processing image {target}")
+            logger.info(f"Generating description for {target}")
 
             encoded_image = await self.file_utils._process_image(target)
             description =  await self.client._describe_image(image = encoded_image,prompt = user_input)
-            logger.info(f"Processed {target}")
             if self.last_mode:
                 self.client.switch_mode(self.last_mode)
             if self.ui and not no_render:
