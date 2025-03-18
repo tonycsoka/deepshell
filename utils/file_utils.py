@@ -132,7 +132,7 @@ class FileUtils:
             return False
 
     async def _process_image(self, file_path):
-        logger.info(f"Processing image: {file_path}")
+        logger.info(f"Encoding image: {file_path}")
         loop = asyncio.get_running_loop()
         try:
             def resize_and_encode():
@@ -279,25 +279,7 @@ class FileUtils:
             results = await self.search_files(missing_path)
             
             if not results:
-                if hasattr(self, "ui") and self.ui is not None:
-                    popup = RadiolistPopup(
-                        title="No matches found",
-                        text=f"No matches found for '{missing_path}'. Would you like to try again?",
-                        options=[("yes", "Yes"), ("no", "No")]
-                    )
-                    self.ui.mount(popup)
-                    retry = await popup.wait_for_choice()
-                    popup.remove()
-                else:
-                    print(f"No matches found for '{missing_path}'.")
-                    retry = input("Would you like to try again? (yes/no): ").strip().lower()
-                if retry == "no":
-                    return "cancel"
-                if hasattr(self, "ui") and self.ui is not None:
-                    missing_path = await self.ui.get_user_input("Modify search term:")
-                else:
-                    missing_path = input("Modify search term: ")
-                continue
+               return "nothing" 
 
             options = [(res, res) for res in results] + [("cancel", "Cancel")]
             if hasattr(self, "ui") and self.ui is not None:

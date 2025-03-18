@@ -134,11 +134,11 @@ class CommandProcessor:
             choice = await self.file_utils.prompt_search(target)
             if not choice:
                 if self.ui:
-                    await self.ui.fancy_print("\n[cyan]System:[/cyan] Nothing found\n")
+                    await self.ui.fancy_print("[cyan]System:[/cyan] Nothing found")
                 return None, None
-            if choice == "cancel":
+            if choice == "cancel" or choice == "nothing":
                 if self.ui:
-                    await self.ui.fancy_print("\n[cyan]System:[/cyan] search canceled by user\n")
+                    await self.ui.fancy_print("[cyan]System:[/cyan] search canceled by user")
                 return choice
             target = choice
 

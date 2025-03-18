@@ -87,7 +87,7 @@ class OllamaClient:
     async def _describe_image(self, image: str | None, prompt: str = "Describe"):
         """Describes an image using the vision model."""
         async with OllamaClient._global_lock:
-            logger.info("Starting image description")
+            logger.info(f"{self.mode.name} describing image")
             
             if not image:
                 logger.warning("No image provided")
