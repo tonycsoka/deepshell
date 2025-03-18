@@ -422,13 +422,14 @@ class CommandExecutor:
             decoded_line (str): The prompt message from the command output.
         """
         if "password:" in decoded_line.lower():
-            response = self.sudo_password or await self._get_user_input("Enter password: ", is_password=True)
+            response =  await self._get_user_input("Enter password: ", is_password=True)
         else:
             response = "yes"
 
-        proc.stdin.write(response.encode() + b"\n")
-        await proc.stdin.drain()
-        response = secrets.token_urlsafe(32)
+        if response is not None:
+            proc.stdin.write(response.encode() + b"\n")
+            await proc.stdin.drain()
+            response = secrets.token_urlsafe(32)
         response = None
 
    
