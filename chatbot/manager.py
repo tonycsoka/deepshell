@@ -1,10 +1,10 @@
 import asyncio
 from ui.ui import ChatMode
 from utils.logger import Logger
-from config.settings import Mode
 from chatbot.helper import PromptHelper
 from chatbot.history import HistoryManager
 from chatbot.deployer import ChatBotDeployer
+from config.settings import Mode, PROCESS_IMAGES
 from utils.command_processor import CommandProcessor
 
 logger = Logger.get_logger()
@@ -16,7 +16,8 @@ class ChatManager:
     """
 
     def __init__(self):
-        self.client, self.filtering = ChatBotDeployer.deploy_chatbot() 
+        self.client, self.filtering = ChatBotDeployer.deploy_chatbot()
+
         self.ui = ChatMode(self) if self.client.render_output else None
         self.last_mode = None
                 
@@ -77,6 +78,9 @@ class ChatManager:
         if bypass_flag or self.client.mode != Mode.DEFAULT:
 
             response = await self.task_manager(user_input = user_input,bypass = bypass_flag)
+            if not response:
+                logger.info("No response detected")
+                return
         
         if self.client.keep_history and self.client.mode != Mode.SHELL and not response:
             history = await self.generate_prompt(user_input)
@@ -92,20 +96,26 @@ class ChatManager:
         return response
 
 
-    async def task_manager(self, user_input = None, history = None, bypass = False):
+    async def task_manager(self, user_input = None, history = None, bypass = None):
         """
         Manages tasks based on the client's mode.
         """
         logger.info("Task manager started in mode: %s", self.client.mode)
 
+        shell_bypass = True if bypass == "shell" else False
+
+        if bypass == None:
+            bypass = ""
+
         mode_handlers = {
-            Mode.SHELL: lambda input: self._handle_shell_mode(input, bypass),
+            Mode.SHELL: lambda input: self._handle_shell_mode(input, shell_bypass),
             Mode.CODE: self._handle_code_mode,
+            Mode.VISION: lambda user_input: self._handle_vision_mode(bypass,user_input),
         }
         
-        if bypass:
+        if shell_bypass:
             logger.info("Bypassing mode, executing shell mode.")
-            return await self._handle_shell_mode(user_input, bypass)
+            return await self._handle_shell_mode(user_input, True)
         
         if self.client.mode in mode_handlers:
             logger.info("Handling task in mode: %s", self.client.mode)
@@ -113,6 +123,30 @@ class ChatManager:
         else:
             logger.info("Handling task in default mode.")
             return await self._handle_default_mode(input= user_input, history = history)
+
+    async def _handle_vision_mode(self,target, user_input,no_render = False):
+        """
+        Handles vision mode, providing description of the image.
+        """
+        if PROCESS_IMAGES:
+            if self.client.mode != Mode.VISION:
+                self.client.switch_mode(Mode.VISION)
+            
+            logger.info(f"Processing image {target}")
+
+            encoded_image = await self.file_utils._process_image(target)
+            description =  await self.client._describe_image(image = encoded_image,prompt = user_input)
+            logger.info(f"Processed {target}")
+            if self.last_mode:
+                self.client.switch_mode(self.last_mode)
+            if self.ui and not no_render:
+                await self.ui.fancy_print(f"[green]AI:[/]{description}")
+            return f"Image description by the vision model: {description}"
+        else:
+            if self.ui:
+                await self.ui.fancy_print("[cyan]System: [/]Image processing is disabled, check your settings.py")
+            logger.warning("Image processing is disabled")
+            return None
 
     async def _handle_shell_mode(self, input, bypass=False, no_render = False):
         """
@@ -224,11 +258,7 @@ class ChatManager:
 
         process_text = asyncio.create_task(filtering.process_stream(False,rendering))
         self.tasks = [get_stream, process_text]
-        
-        # if self.ui and not no_render:
-        #     rendering_task = asyncio.create_task(self.ui.transfer_buffer(filtering.buffer))
-        #     self.tasks.append(rendering_task)
-       
+         
         await self.execute_tasks() 
         logger.info("Default mode execution completed.")
 

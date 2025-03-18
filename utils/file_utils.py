@@ -6,9 +6,7 @@ import aiofiles
 from PIL import Image
 from io import BytesIO
 from utils.logger import Logger
-from config.settings import Mode
 from ui.popups import RadiolistPopup
-from chatbot.deployer import ChatBotDeployer
 from config.settings import SUPPORTED_EXTENSIONS, IGNORED_FOLDERS, MAX_FILE_SIZE, MAX_LINES, CHUNK_SIZE, PROCESS_IMAGES, IMG_INPUT_RES
 
 logger = Logger.get_logger()
@@ -31,8 +29,7 @@ class FileUtils:
         self.file_locks = {}
 
         if PROCESS_IMAGES:
-            deployer = ChatBotDeployer()
-            self.image_processor, _ = deployer.deploy_chatbot(Mode.VISION)
+            self.image_processor = manager._handle_vision_mode
 
 
     def set_index_functions(self, index_file, add_folder):
@@ -76,7 +73,10 @@ class FileUtils:
                 if PROCESS_IMAGES:
                     if self._is_image(file_path):
                         await self._print_message(f"Processing the image: {file_path}")
-                        return await self._process_image(file_path)
+                        description =  await self.image_processor(file_path,"Describe this image",True)
+                        logger.info(f"Processed {file_path}")
+                        return f"Image description by the vision model: {description}"
+
                 else:
                     if self._is_image(file_path):
                         logger.info(f"Skipping image file {file_path}")
@@ -143,9 +143,7 @@ class FileUtils:
                     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
             encoded_image = await loop.run_in_executor(None, resize_and_encode)
-            description =  await self.image_processor._describe_image(encoded_image)
-            logger.info(f"Processed {file_path}")
-            return f"Image description by the vision model: {description}"
+            return encoded_image
         except Exception as e:
             logger.error(f"Error processing image {file_path}: {e}")
 
