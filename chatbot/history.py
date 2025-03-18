@@ -466,11 +466,11 @@ class HistoryManager:
                     label = "Referenced Terminal Output"
                 else:
                     label = "Referenced Content"
-                content_references += f"\n[{label}: {identifier}]\n{content}\n..."
+                content_references += f"\n[{label}: {identifier}]\n{content}\n"
         
-        prompt = f"{query}\n\n{content_references}" if content_references else query
-        
-        logger.debug(f"Generated prompt: {prompt}")
+        prompt = f"{content_references}\nUser query: {query}" if content_references else query
+
+        logger.debug(f"Generated prompt: {prompt}") 
         await self.add_message("user", prompt, embedding)
         
         return self.current_topic.history[-num_messages:]
