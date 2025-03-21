@@ -3,6 +3,7 @@ import asyncio
 from utils.pipe_utils import PipeUtils
 from utils.args_utils import parse_args
 from chatbot.manager import ChatManager
+from ollama_client.validator import validate_models
 from utils.symlink_utils import create_symlink, remove_symlink
 
 
@@ -15,7 +16,7 @@ async def async_main():
     if args.uninstall:
         remove_symlink()
         return
-
+    validate_models()
     chat_manager = ChatManager()
     pipe_utils = PipeUtils(chat_manager)
 
@@ -38,7 +39,6 @@ async def async_main():
         if chat_manager.ui:
             chat_manager.ui.user_input, chat_manager.ui.file, chat_manager.ui.file_content = user_input, file, pipe_content
             
-            # Use the async version of run()
             await chat_manager.ui.run_async()
 
 if __name__ == "__main__":
