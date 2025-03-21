@@ -18,7 +18,6 @@ class ChatManager:
 
     def __init__(self):
         self.client, self.filtering = ChatBotDeployer.deploy_chatbot()
-
         self.ui = ChatMode(self) if self.client.render_output else None
         self.last_mode = None
 
@@ -26,34 +25,38 @@ class ChatManager:
         self.file_utils = self.command_processor.file_utils
         self.executor = self.command_processor.executor
 
+        self.tasks = []
+        self.task_queue = asyncio.Queue()
+        self.worker_running = False
+
+      
+    async def init(self):
+        """
+        Helper function to initialize ChatMode.
+        """
         self.history_manager = HistoryManager(self)
         self.add_to_history = self.history_manager.add_message
         self.add_terminal_output = self.history_manager.add_terminal_output
         self.generate_prompt = self.history_manager.generate_prompt
-
         self.file_utils.set_index_functions(
             self.history_manager.add_file,
             self.history_manager.add_folder_structure
         )
 
-        self.tasks = []
-        # Unified queue for heavy chatbot processing calls.
-        self.task_queue = asyncio.Queue()
-        self.worker_running = False  # Flag to track worker status
-
-        # Start the heavy-task worker loop.
-        asyncio.create_task(self.task_worker())
-
-    async def init_shell(self):
-        """
-        Helper function to initialize shell session.
-        """
+        self.worker_task = asyncio.create_task(self.task_worker())
         await self.executor.start_shell()
 
-    async def stop_shell(self):
+    async def stop(self):
         """
-        Helper function to stop the shell session.
+        Helper function to stop the ChatMode.
         """
+        if self.worker_task and not self.worker_task.done():
+            self.worker_task.cancel()
+            try:
+                await self.worker_task
+                logger.info("Worker process is terminated")
+            except asyncio.CancelledError:
+                logger.error("Worker task cancelled") 
         await self.executor.stop_shell()
 
     async def deploy_task(self, user_input=None, file_name=None, file_content=None):

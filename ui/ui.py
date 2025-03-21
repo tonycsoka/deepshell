@@ -49,7 +49,7 @@ class ChatMode(App):
 
         await self.rendering.start_processing() 
 
-        asyncio.create_task(self.manager.init_shell())
+        asyncio.create_task(self.manager.init())
  
         # Deploy the task with the file and user input if available
         if self.user_input or self.file or self.file_content:
@@ -88,7 +88,7 @@ class ChatMode(App):
         
 
     async def exit_app(self):
-        await self.manager.stop_shell()
+        await self.manager.stop()
 
         self.exit()
 
