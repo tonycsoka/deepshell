@@ -335,7 +335,8 @@ class ChatManager:
             await asyncio.gather(chat_task, filter_task)
 
         # Pass the job to deploy_chatbot_method
-        return await self.deploy_chatbot_method(streaming_job)
+        await self.deploy_chatbot_method(streaming_job)
+        return self.client.last_response
 
 
     async def execute_tasks(self):
