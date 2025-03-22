@@ -56,7 +56,9 @@ class CommandExecutor:
                 return "Error: Shell process could not be started."
 
         if "sudo" in shlex.split(command):
-            await self._get_sudo_password()
+            valid = await self._get_sudo_password()
+            if valid == 1:
+                return None
 
         # Unique delimiter to detect command completion
         delimiter = "----END-OF-COMMAND----"
@@ -160,7 +162,7 @@ class CommandExecutor:
         if require_sudo: 
             logger.info("Requesting sudo password.")
             sudo_password = await self._get_sudo_password(return_password=True)
-            if not sudo_password:
+            if sudo_password == 1:
                 logger.warning("Sudo password not provided.")
                 return None
             command = f"echo {sudo_password} | sudo -S {command[5:]}"
@@ -309,10 +311,11 @@ class CommandExecutor:
         """
         if self.sudo_password:
             if await self._validate_sudo_password(None):
-                return
+                return 0
             else:
                 self.sudo_password = None
                 logger.warning("Sudo session expired, password required again.")
+
 
         # Prompt for a new password
         sudo_password = await self._get_user_input("Enter sudo password: ", is_password=True)
@@ -324,9 +327,11 @@ class CommandExecutor:
                 self.sudo_password = True
                 sudo_password = None
                 logger.info("Sudo password validated and cleared securely.")
+                return 0
             else:
                 await self._print_message("Wrong password")
                 logger.warning("Wrong sudo password")
+                return 1
 
 
     async def _validate_sudo_password(self, sudo_password):
