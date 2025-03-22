@@ -1,3 +1,4 @@
+import json
 import asyncio
 from utils.logger import Logger
 from typing import AsyncGenerator, cast
@@ -124,6 +125,30 @@ class OllamaClient:
             except Exception as e:
                 logger.error(f"Error fetching response: {e}")
                 return "Error fetching response"
+
+
+    async def _call_function(self, input, functions = None):
+        """Fetches a complete response from the model."""
+        async with OllamaClient._global_lock:
+            logger.info(f"{self.mode.name} is fetching response")
+            logger.info(functions)
+
+            try:
+                message = {'role': 'user', 'content': input}
+                response = await self.client.chat(model=self.model, messages=[message],tools = functions)
+                logger.info(f"Full response: {response}")
+                if response.message.tool_calls:
+                    return response.message.tool_calls
+                             
+                else:
+                    logger.info("No functions have been called")
+                    return None
+                
+            except Exception as e:
+                logger.error(f"Error fetching response: {e}")
+                return "Error fetching response"
+
+
 
     @staticmethod
     async def fetch_embedding(text: str):

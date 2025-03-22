@@ -81,6 +81,7 @@ class ChatManager:
                 user_input = f"{user_input} Content: {file_content}"
         else:
             logger.info("No file content, processing user input.")
+           #await self.command_processor.ai_handler(user_input)
             user_input = await self.command_processor.handle_command(user_input)
 
         user_input, bypass_flag = (
@@ -187,6 +188,16 @@ class ChatManager:
             logger.info("Handling task in default mode.")
             return await self._handle_default_mode(input=user_input, history=history)
 
+    async def _handle_command_processor(self, input,functions):
+        if self.client.mode != Mode.SYSTEM:
+            self.client.switch_mode(Mode.SYSTEM)
+                                 
+        tools = await self.deploy_chatbot_method(self.client._call_function, input, functions)
+       
+        self.client.switch_mode(self.last_mode)
+
+        return tools
+
 
     async def _handle_helper_mode(self, input,strip_json = False):
         if self.client.mode != Mode.HELPER:
@@ -238,6 +249,8 @@ class ChatManager:
             code_input = await self._handle_code_mode(PromptHelper.shell_helper(input), no_render=True)
             input, output = await self.executor.start(code_input)
         else:
+            self.client.switch_mode(Mode.SHELL)
+
             output = await self.executor.run_command(input)
 
         if output == "pass":
@@ -257,14 +270,12 @@ class ChatManager:
                     if self.tasks:
                         asyncio.create_task(self.execute_tasks())
                     await self.ui.fancy_print("[cyan]System:[/] Output submitted to the chatbot for analysis...")
-                    prompt = PromptHelper.analyzer_helper(input, output)
-                    self.client.switch_mode(Mode.SYSTEM)
+                    prompt = PromptHelper.analyzer_helper(input, output) 
                     get_summary = self.deploy_chatbot_method(self.client._chat_stream, prompt)
                     filter_summary = self.deploy_chatbot_method(self.filtering.process_stream, False, render=not no_render)
                     await asyncio.gather(get_summary, filter_summary)
                     if self.client.keep_history and self.client.last_response:
                         await self.add_terminal_output(input, output, self.client.last_response)
-                    self.client.switch_mode(Mode.SHELL)
                     return self.client.last_response
                 else:
                     if self.tasks:
