@@ -48,13 +48,12 @@ class PromptHelper:
         """
         return f"""
         Analyze the output of the following command: {command}
+
         Output: {output}  
 
 
         Summarize key details, highlighting errors, warnings, and important findings.
-        Timestamp: {PromptHelper.current_time}
-        Note: The timestamp included above is the actual current system time.
-        Please do not interpret this as an error or a future date—treat it as accurate.
+        Command was executed at: {PromptHelper.current_time}
         """
 
     @staticmethod
