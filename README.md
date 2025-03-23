@@ -31,13 +31,13 @@ Prepare the tool for execution:
 pip install -r requirements.txt
 ```
 
-Bind DeepSeek-Shell to your system:
+Bind DeepShell to your system:
 
 ```sh
 chmod +x deepshell
 ./deepshell --install
 ```
-This binds DeepSeek-Shell to your system, making it accessible from anywhere.
+This binds DeepShell to your system, making it accessible from anywhere.
 
 ## Sculpting the Intent
 
