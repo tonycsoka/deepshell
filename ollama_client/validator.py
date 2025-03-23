@@ -1,10 +1,37 @@
 import os
 import ast
 import ollama
+import subprocess
+from config.settings import DEFAULT_HOST
 
-# Dynamically resolve config/settings.py relative to ensure_models.py
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  
-CONFIG_PATH = os.path.join(BASE_DIR, "..", "config", "settings.py") 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.path.join(BASE_DIR, "..", "config", "settings.py")
+REQUIRED_VERSION = "0.6.2"
+
+def get_installed_version():
+    """Check the installed Ollama version."""
+    try:
+        output = subprocess.check_output(["ollama", "--version"], text=True).strip()
+        return output.split()[-1]
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+def ensure_ollama():
+    """Check if Ollama is installed and up to date. If not, print instructions and return False."""
+    installed_version = get_installed_version()
+
+    if installed_version is None:
+        print("Ollama is not installed. Run the following command to install it:")
+        print("curl -fsSL https://ollama.com/install.sh | sh")
+        return False
+
+    if installed_version < REQUIRED_VERSION:
+        print(f"Ollama version {installed_version} is outdated. Run the following command to update:")
+        print("curl -fsSL https://ollama.com/install.sh | sh")
+        return False
+
+    print(f"Ollama is installed and up to date (version {installed_version}).")
+    return True
 
 def extract_model_names(config_path=CONFIG_PATH):
     """ Extract values from all *_MODEL variables in settings.py """
@@ -30,29 +57,31 @@ def extract_model_names(config_path=CONFIG_PATH):
 
     return model_names
 
+def validate_install(config_path=CONFIG_PATH):
+    """ Ensure Ollama is installed and up to date before checking models. """
 
-def validate_models(config_path=CONFIG_PATH):
-    """ Ensure that all required models are available in Ollama. """
+    if DEFAULT_HOST != "http://localhost:11434":
+        return True
+
+    if not ensure_ollama():
+        return False
+
     model_names = extract_model_names(config_path)
-
     available_model_names = set()
-
 
     try:
         available_models = ollama.list()
         available_models = available_models.models
-        for Model in available_models:
-            available_model_names.add(Model.model)
-
+        for model in available_models:
+            available_model_names.add(model.model)
     except Exception as e:
         raise RuntimeError(f"Failed to list models using Ollama: {e}")
-
 
     missing_models = model_names - available_model_names
 
     if not missing_models:
         print("All required models are already available.")
-        return
+        return True
 
     for model in missing_models:
         try:
@@ -61,3 +90,4 @@ def validate_models(config_path=CONFIG_PATH):
         except Exception as e:
             print(f"Failed to pull model '{model}': {e}")
 
+    return True

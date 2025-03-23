@@ -1,8 +1,8 @@
-import json
+import ollama
 import asyncio
 from utils.logger import Logger
 from typing import AsyncGenerator, cast
-from ollama import AsyncClient, embeddings
+from config.settings import DEFAULT_HOST
 from config.settings import Mode, MODE_CONFIGS, EMBEDDING_MODEL
 
 logger = Logger.get_logger()
@@ -13,7 +13,7 @@ class OllamaClient:
 
     def __init__(self, host, model, config, mode, stream=True, render_output=True, show_thinking=False):
         logger.info("Initializing OllamaClient")
-        self.client = AsyncClient(host=host)
+        self.client = ollama.AsyncClient(host=host)
         self.model = model
         self.config = config
         self.mode = mode
@@ -157,10 +157,11 @@ class OllamaClient:
         that no other locked operation (such as streaming) runs concurrently.
         """
         async with OllamaClient._global_lock:
+            client = ollama.Client(host=DEFAULT_HOST)
             try:
                 logger.info("Fetching embedding")
                 # Offload blocking work to a thread if needed
-                response = await asyncio.to_thread(embeddings, model=EMBEDDING_MODEL, prompt=text)
+                response = await asyncio.to_thread(client.embeddings, model=EMBEDDING_MODEL, prompt=text)
                 embedding = response['embedding']
                 logger.debug(f"Extracted {len(embedding)} embeddings")
                 return embedding
