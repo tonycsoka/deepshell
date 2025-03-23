@@ -1,3 +1,4 @@
+import sys
 import time
 import asyncio
 from ui.ui import ChatMode
@@ -19,6 +20,8 @@ class ChatManager:
     def __init__(self):
         self.client, self.filtering = ChatBotDeployer.deploy_chatbot()
         self.ui = ChatMode(self) if self.client.render_output else None
+        if not self.ui:
+            self.client.keep_history = False
         self.last_mode = None
 
         self.command_processor = CommandProcessor(self)
@@ -79,6 +82,7 @@ class ChatManager:
                 user_input = f"Analyze this: {file_content}"
             else:
                 user_input = f"{user_input} Content: {file_content}"
+ 
         else:
             logger.info("No file content, processing user input.")
            #await self.command_processor.ai_handler(user_input)
@@ -87,7 +91,7 @@ class ChatManager:
         user_input, bypass_flag = (
             user_input if isinstance(user_input, tuple) else (user_input, False)
         )
-
+        
         logger.info("Executing task manager.")
 
         if bypass_flag or self.client.mode != Mode.DEFAULT:
@@ -95,6 +99,9 @@ class ChatManager:
             if not response:
                 logger.info("No response detected")
                 return
+        if not sys.stdout.isatty():
+            logger.info("Deploying the task")
+            return await self.task_manager(user_input)
 
         if self.client.keep_history and self.client.mode != Mode.SHELL and not response:
             history = await self.generate_prompt(user_input)
@@ -299,7 +306,7 @@ class ChatManager:
         """
         logger.info("Code mode execution started.")
         response = await self.deploy_chatbot_method(self.client._fetch_response, input)
-        code = await self.deploy_chatbot_method(self.filtering.process_static, response, True)
+        code = await self.filtering.process_static(response, True)
         if code:
             if self.ui and not no_render:
                 await self.ui.fancy_print(code)
@@ -312,30 +319,30 @@ class ChatManager:
         """
         logger.info("Default mode execution started.")
 
-        client = self.client
-        filtering = self.filtering
-
-        if history and not input:
-            logger.info("Using chat history.")
-            chat_task = client._chat_stream(history=history)
-        elif input and not history:
-            logger.info("Using user input.")
-            chat_task = client._chat_stream(input)
-        else:
-            logger.error("Invalid input.")
-            return
-
         # Decide whether to render output
-        rendering = True if self.ui and not no_render else False
-        filter_task = filtering.process_stream(False, render=rendering)
+        if self.ui and not no_render:
+            if history and not input:
+                logger.info("Using chat history.")
+                chat_task = self.client._chat_stream(history=history)
+            elif input and not history:
+                logger.info("Using user input.")
+                chat_task = self.client._chat_stream(input)
+            else:
+                logger.error("Invalid input.")
+                return
 
-        # Create a single async job for both tasks
-        async def streaming_job():
-            await asyncio.gather(chat_task, filter_task)
+            filter_task = self.filtering.process_stream(False, render=True)
 
-        # Pass the job to deploy_chatbot_method
-        await self.deploy_chatbot_method(streaming_job)
-        return self.client.last_response
+            # Create a single async job for both tasks
+            async def streaming_job():
+                await asyncio.gather(chat_task, filter_task)
+
+            # Pass the job to deploy_chatbot_method
+            await self.deploy_chatbot_method(streaming_job)
+            return self.client.last_response
+        else:
+            response = await self.deploy_chatbot_method(self.client._fetch_response, input)
+            return await self.filtering.process_static(response, False)
 
 
     async def execute_tasks(self):

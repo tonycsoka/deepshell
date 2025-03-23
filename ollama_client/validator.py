@@ -2,7 +2,11 @@ import os
 import ast
 import ollama
 import subprocess
+from utils.logger import Logger
 from config.settings import DEFAULT_HOST
+
+
+logger = Logger.get_logger()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "..", "config", "settings.py")
@@ -30,7 +34,7 @@ def ensure_ollama():
         print("curl -fsSL https://ollama.com/install.sh | sh")
         return False
 
-    print(f"Ollama is installed and up to date (version {installed_version}).")
+    logger.info(f"Ollama is installed and up to date (version {installed_version}).")
     return True
 
 def extract_model_names(config_path=CONFIG_PATH):
@@ -80,7 +84,7 @@ def validate_install(config_path=CONFIG_PATH):
     missing_models = model_names - available_model_names
 
     if not missing_models:
-        print("All required models are already available.")
+        logger.info("All required models are already available.")
         return True
 
     for model in missing_models:

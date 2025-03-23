@@ -29,8 +29,8 @@ async def async_main():
             pipe_content = await pipe_utils.read_pipe()
         if stdout_piped:
             chat_manager.ui = None
-            await chat_manager.deploy_task(user_input, file, pipe_content)
-            print(chat_manager.client.last_response, end="")
+            response = await chat_manager.deploy_task(user_input, file, pipe_content)
+            print(response)
         else:
             if chat_manager.ui:
                 chat_manager.ui.user_input, chat_manager.ui.file, chat_manager.ui.file_content = user_input, file, pipe_content

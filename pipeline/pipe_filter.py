@@ -107,13 +107,16 @@ class PipeFilter:
         thoughts = re.findall(r"<think>(.*?)</think>", text, flags=re.DOTALL)
         filtered_text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
 
+        # Apply additional line-based filtering
+        pattern = re.compile(r'(#{3,4}|\*\*)')
+        filtered_lines = [pattern.sub("", line) for line in filtered_text.splitlines()]
+        filtered_text = "\n".join(filtered_lines)
+
         self.ollama_client.last_response = filtered_text
         self.ollama_client.thoughts.append(thoughts)
-         
 
         logger.debug(f"Filtered text: {filtered_text} \nThoughts: {thoughts}")
         return filtered_text
-   
 
     async def extract_code(self, response):
         """Extracts shell or code snippets from the response.

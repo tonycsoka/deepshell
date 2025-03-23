@@ -6,6 +6,7 @@ import aiofiles
 from PIL import Image
 from io import BytesIO
 from utils.logger import Logger
+from ui.printer import printer
 from ui.popups import RadiolistPopup
 from config.settings import SUPPORTED_EXTENSIONS, IGNORED_FOLDERS, MAX_FILE_SIZE, MAX_LINES, CHUNK_SIZE, PROCESS_IMAGES, IMG_INPUT_RES
 
@@ -42,7 +43,7 @@ class FileUtils:
         if not os.path.exists(target):
             choice = await self.prompt_search(target)
             if not choice:
-                await self._print_message("[yellow]Nothing found[/yellow]")
+                printer("[yellow]Nothing found[/yellow]")
                 return -1
             target = choice
 
@@ -54,7 +55,7 @@ class FileUtils:
             await self.read_folder(target)
 
         logger.info("File operations complete")
-        await self._print_message("File processing complete, submiting the input to the chatbot")
+        printer("File processing complete, submiting the input to the chatbot")
 
 
    
@@ -72,7 +73,7 @@ class FileUtils:
             async with self.file_locks[file_path]:
                 if PROCESS_IMAGES:
                     if self._is_image(file_path):
-                        await self._print_message(f"Processing the image: {file_path}")
+                        printer(f"Processing the image: {file_path}")
                         description =  await self.image_processor(file_path,"Describe this image",True)
                         logger.info(f"Processed {file_path}")
                         return f"Image description by the vision model: {description}"
@@ -81,7 +82,7 @@ class FileUtils:
                     if self._is_image(file_path):
                         logger.info(f"Skipping image file {file_path}")
 
-                await self._print_message(f"Reading {file_path}")
+                printer(f"Reading {file_path}")
 
                 if os.path.getsize(file_path) > self.max_file_size:
                     content = await self._read_last_n_lines(file_path, self.max_lines)
@@ -214,7 +215,7 @@ class FileUtils:
            are attempted to be read (others are skipped).
         """
         logger.info(f"Opening {folder_path}")
-        await self._print_message(f"Opening {folder_path}")
+        printer(f"Opening {folder_path}")
 
         if root_folder is None:
             root_folder = folder_path
@@ -222,7 +223,7 @@ class FileUtils:
         all_contents = []  # To collect content from all files
 
         try:
-            await self._print_message(f"Generating structure for {folder_path}")
+            printer(f"Generating structure for {folder_path}")
             generated_structure = self.generate_structure(folder_path, root_folder)
             if self.add_folder:
                 self.add_folder(generated_structure)
@@ -308,10 +309,3 @@ class FileUtils:
                 return "cancel"
             return choice
 
-
-    async def _print_message(self, message: str):
-        """Print messages either through UI or terminal."""
-        if self.ui:
-            await self.ui.fancy_print(f"[cyan]System:[/cyan] {message}")
-        else:
-            print(message)

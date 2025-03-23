@@ -51,8 +51,6 @@ class Rendering:
     @staticmethod
     async def _fancy_print(content):
         """Static method to enqueue print job."""
-        if not Rendering._chat_app_instance:
-            raise ValueError("ChatApp instance not set in Rendering")
-
-        await Rendering._chat_app_instance.rendering.fancy_print(content)
+        if Rendering._chat_app_instance:
+            await Rendering._chat_app_instance.rendering.fancy_print(content)
 

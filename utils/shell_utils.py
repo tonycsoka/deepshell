@@ -3,6 +3,7 @@ import shlex
 import string
 import asyncio
 import secrets
+from ui.printer import printer
 from utils.logger import Logger
 from config.settings import SHELL_TYPE, MONITOR_INTERVAL, MAX_OUTPUT_LINES, FINALIZE_OUTPUT
 
@@ -275,7 +276,7 @@ class CommandExecutor:
                 "\nCommand is taking longer than expected. Cancel execution? (y/n): "
             )
             if user_choice.strip().lower() in ["y", "yes"]:
-                await self._print_message("Terminating command execution...")
+                printer("Terminating command execution...")
                 proc.terminate()
                 break
 
@@ -329,7 +330,7 @@ class CommandExecutor:
                 logger.info("Sudo password validated and cleared securely.")
                 return 0
             else:
-                await self._print_message("Wrong password")
+                printer("Wrong password")
                 logger.warning("Wrong sudo password")
                 return 1
 
@@ -464,10 +465,3 @@ class CommandExecutor:
         else:
             return input(prompt_text)
 
-
-    async def _print_message(self, message: str):
-        """Print messages either through UI or terminal."""
-        if self.ui:
-            await self.ui.fancy_print(f"[cyan]System:[/cyan] {message}")
-        else:
-            print(message)
