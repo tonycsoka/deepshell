@@ -19,9 +19,9 @@ _A whisper in the void, a tool forged in silence._ DeepShell is your clandestine
 ## Claim the Artifact
 Not all tools are found. Some must be taken.
 
-[Take Hold of DeepShell](https://github.com/Abyss-c0re/deepshell/releases)
+[**Take Hold of DeepShell**](https://github.com/Abyss-c0re/deepshell/releases)
 
-It does not seek you. But now, it is yours.
+_It does not seek you. But now, it is yours._
 
 ## Awakening the Entity
 
@@ -30,7 +30,6 @@ Prepare the tool for execution:
 ```sh
 pip install -r requirements.txt
 ```
-
 Bind DeepShell to your system:
 
 ```sh
@@ -41,7 +40,7 @@ This binds DeepShell to your system, making it accessible from anywhere.
 
 ## Sculpting the Intent
 
-[Configuration](https://github.com/Abyss-c0re/deepshell/wiki#configuration)
+[**Requires configuration**](https://github.com/Abyss-c0re/deepshell/wiki#configuration)
 
 ## The Art of Invocation
 
