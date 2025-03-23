@@ -94,7 +94,7 @@ class CommandExecutor:
         logger.debug(f"Command result : {result}")
 
         if exit_code == 0 and not result:
-            logger.info("Command executed successfully with no output")
+
             return "pass"
 
         

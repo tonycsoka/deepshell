@@ -254,8 +254,9 @@ class ChatManager:
             output = await self.executor.run_command(input)
 
         if output == "pass":
+            logger.info("Command executed successfully with no output")
             if self.ui:
-                await self.ui.fancy_print("[cyan]System:[/] Command executed successfully")
+                await self.ui.fancy_print("[cyan]System:[/] Command executed successfully without producing any output")
             return "pass"
 
         if output and input:
@@ -270,10 +271,9 @@ class ChatManager:
                     if self.tasks:
                         asyncio.create_task(self.execute_tasks())
                     await self.ui.fancy_print("[cyan]System:[/] Output submitted to the chatbot for analysis...")
-                    prompt = PromptHelper.analyzer_helper(input, output) 
-                    get_summary = self.deploy_chatbot_method(self.client._chat_stream, prompt)
-                    filter_summary = self.deploy_chatbot_method(self.filtering.process_stream, False, render=not no_render)
-                    await asyncio.gather(get_summary, filter_summary)
+                    prompt = PromptHelper.analyzer_helper(input, output)
+                    await self._handle_default_mode(input=prompt,no_render=no_render)
+
                     if self.client.keep_history and self.client.last_response:
                         await self.add_terminal_output(input, output, self.client.last_response)
                     return self.client.last_response
@@ -286,8 +286,7 @@ class ChatManager:
         else:
             logger.warning("No output detected.")
             if self.ui:
-                await self.ui.fancy_print("\nNo output detected...\n")
-
+                await self.ui.fancy_print("[cyan]System:[/] No output detected...")
         self.client.last_response = ""
         self.filtering.extracted_code = ""
         logger.info("Shell mode execution completed.")
