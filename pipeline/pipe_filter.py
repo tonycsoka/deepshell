@@ -11,8 +11,7 @@ class PipeFilter:
         self.input_buffer = ollama_client.output_buffer  
         self.formatting = ollama_client.render_output
         self.extracted_code = None
-
-    
+ 
     async def process_stream(self, extract_code=False, render=True):
         """Processes the input stream, handling thoughts and code differently based on config."""
         full_input = ""
@@ -68,15 +67,19 @@ class PipeFilter:
                 i += 1
 
             if output:
+                                
                 if first_chunk:
-                    output = "[purple]AI: [/]" + output.lstrip("\n")
+                    prefix = "[purple]AI: [/]"
+                    formatted_output = prefix + output.lstrip("\n")
+                    accumulated_line += formatted_output
                     first_chunk = False
-                results += output
-                accumulated_line += output
+                else:
 
+                    accumulated_line += output
+                results += output
             
             if "\n" in accumulated_line:
-                lines = accumulated_line.split("\n")
+                lines = accumulated_line.split("\n") 
                 for line in lines[:-1]:
                     if line.strip() and render:
                         printer(line)
