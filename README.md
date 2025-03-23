@@ -19,32 +19,11 @@ _A whisper in the void, a tool forged in silence._ DeepShell is your clandestine
 ## Claim the Artifact
 Not all tools are found. Some must be taken.
 
-🔗 [Take Hold of DeepShell](https://github.com/Abyss-c0re/deepshell/releases)
+[Take Hold of DeepShell](https://github.com/Abyss-c0re/deepshell/releases)
 
 It does not seek you. But now, it is yours.
 
 ## Awakening the Entity
-
-Ensure the deepseek is within your grasp:
-
-```sh
-chmod +x intall_ollama.sh
-sh install_ollama.sh
-```
-This shall intall ollama and pull the required models from `/config/settings.py`
-If one is not plannigng to use vision model, empty the `VISION_MODEL = ""` string, to avoid downloading.
-
-For those who prefer the traditional way:
-
-```sh
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull deepseek-r1:1.5b
-ollama pull deepseek-r1:8b
-ollama pull deepseek-coder-v2:16b
-ollama pull llava:13b
-ollama pull nomic-embed-text:latest
-ollama serve 
-```
 
 Prepare the tool for execution:
 
@@ -58,14 +37,11 @@ Bind DeepSeek-Shell to your system:
 chmod +x deepshell
 ./deepshell --install
 ```
-
 This binds DeepSeek-Shell to your system, making it accessible from anywhere.
 
 ## Sculpting the Intent
 
-DeepSeek-Shell’s behavior is governed by the `config/settings.py` file.
-
-One may enable image processing there if so desired.
+[Configuration](https://github.com/Abyss-c0re/deepshell/wiki#configuration)
 
 ## The Art of Invocation
 
