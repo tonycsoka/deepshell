@@ -1,4 +1,5 @@
 from enum import Enum, auto
+from config.system_prompts import *
 
 class Mode(Enum):
     DEFAULT = auto()
@@ -23,12 +24,11 @@ EMBEDDING_MODEL = "nomic-embed-text:latest"
 # Mapping Mode to Configuration
 MODE_CONFIGS = {
     Mode.DEFAULT: {"model": DEFAULT_MODEL, "temp": 0.4, "prompt": "", "stream": True},
-    Mode.CODE:    {"model": CODE_MODEL, "temp": 0.5, "prompt": "", "stream": True},
-    Mode.SHELL:   {"model": SHELL_MODEL, "temp": 0.4, "prompt": "", "stream": True},
-    Mode.SYSTEM:  {"model": SYSTEM_MODEL, "temp": 0.5, "prompt": "", "stream": True},
+    Mode.CODE:    {"model": CODE_MODEL, "temp": 0.5, "prompt": CODE, "stream": True},
+    Mode.SHELL:   {"model": SHELL_MODEL, "temp": 0.4, "prompt": SHELL, "stream": True},
+    Mode.SYSTEM:  {"model": SYSTEM_MODEL, "temp": 0.5, "prompt": SYSTEM, "stream": True},
     Mode.HELPER:  {"model": HELPER_MODEL, "temp": 0.5, "prompt": "", "stream": False},
     Mode.VISION:  {"model": VISION_MODEL, "temp": 0.6, "prompt": "", "stream": False},
-
 }
 
 #Logging
@@ -78,4 +78,4 @@ SUPPORTED_EXTENSIONS = [
     '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.svg'
 ]
 
-IGNORED_FOLDERS =  ['__pycache__', '.git', '.svn', '.hg', 'Android', 'android-studio', 'miniconda3']
+IGNORED_FOLDERS =  ['__pycache__', '.git', '.github', '.svn', '.hg', 'Android', 'android-studio', 'miniconda3']

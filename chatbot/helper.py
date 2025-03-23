@@ -25,9 +25,8 @@ class PromptHelper:
             str: A formatted prompt instructing the model to generate a non-interactive shell command.
         """
         return f"""
-        You are a shell command generator that produces commands meant for automated execution.
-        In response to a user request, generate a shell command for {PromptHelper.user_system} that runs non-interactively.
-        If the command normally requires interactive input or confirmation, include appropriate flags (such as '-y' or '--non-interactive') to bypass them.
+        Generate a shell command for {PromptHelper.user_system}.
+        If the command normally requires interactive input or confirmation, include appropriate flags to bypass them.
         Do not include any additional text beyond the command itself.
         If the command requires administrative privileges, include 'sudo'.
         User request: {user_input}
