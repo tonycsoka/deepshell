@@ -43,7 +43,7 @@ class FileUtils:
         if not os.path.exists(target):
             choice = await self.prompt_search(target)
             if not choice:
-                printer("[yellow]Nothing found[/yellow]")
+                printer("[yellow]Nothing found[/yellow]",True)
                 return -1
             target = choice
 
@@ -55,7 +55,7 @@ class FileUtils:
             await self.read_folder(target)
 
         logger.info("File operations complete")
-        printer("File processing complete, submiting the input to the chatbot")
+        printer("File processing complete, submiting the input to the chatbot",True)
 
 
    
@@ -73,7 +73,7 @@ class FileUtils:
             async with self.file_locks[file_path]:
                 if PROCESS_IMAGES:
                     if self._is_image(file_path):
-                        printer(f"Processing the image: {file_path}")
+                        printer(f"Processing the image: {file_path}",True)
                         description =  await self.image_processor(file_path,"Describe this image",True)
                         logger.info(f"Processed {file_path}")
                         return f"Image description by the vision model: {description}"
@@ -82,7 +82,7 @@ class FileUtils:
                     if self._is_image(file_path):
                         logger.info(f"Skipping image file {file_path}")
 
-                printer(f"Reading {file_path}")
+                printer(f"Reading {file_path}",True)
 
                 if os.path.getsize(file_path) > self.max_file_size:
                     content = await self._read_last_n_lines(file_path, self.max_lines)
@@ -215,7 +215,7 @@ class FileUtils:
            are attempted to be read (others are skipped).
         """
         logger.info(f"Opening {folder_path}")
-        printer(f"Opening {folder_path}")
+        printer(f"Opening {folder_path}",True)
 
         if root_folder is None:
             root_folder = folder_path
@@ -223,7 +223,7 @@ class FileUtils:
         all_contents = []  # To collect content from all files
 
         try:
-            printer(f"Generating structure for {folder_path}")
+            printer(f"Generating structure for {folder_path}",True)
             generated_structure = self.generate_structure(folder_path, root_folder)
             if self.add_folder:
                 self.add_folder(generated_structure)

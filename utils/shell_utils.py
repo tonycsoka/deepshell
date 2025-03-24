@@ -97,8 +97,7 @@ class CommandExecutor:
         if exit_code == 0 and not result:
 
             return "pass"
-
-        
+ 
         if result and self.finalize_output:
             result = await self._finalize_command_output(output_lines)
             return result if result else f"Command failed with exit code {exit_code}"
@@ -276,7 +275,7 @@ class CommandExecutor:
                 "\nCommand is taking longer than expected. Cancel execution? (y/n): "
             )
             if user_choice.strip().lower() in ["y", "yes"]:
-                printer("Terminating command execution...")
+                printer("Terminating command execution...",True)
                 proc.terminate()
                 break
 
@@ -330,7 +329,7 @@ class CommandExecutor:
                 logger.info("Sudo password validated and cleared securely.")
                 return 0
             else:
-                printer("Wrong password")
+                printer("Wrong password",True)
                 logger.warning("Wrong sudo password")
                 return 1
 

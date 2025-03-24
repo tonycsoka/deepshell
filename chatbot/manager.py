@@ -2,6 +2,7 @@ import sys
 import time
 import asyncio
 from ui.ui import ChatMode
+from ui.printer import printer
 from utils.logger import Logger
 from chatbot.helper import PromptHelper
 from chatbot.history import HistoryManager
@@ -236,12 +237,12 @@ class ChatManager:
             logger.info("Processed image %s", target)
             if self.last_mode:
                 self.client.switch_mode(self.last_mode)
-            if self.ui and not no_render:
-                await self.ui.fancy_print(f"[green]AI:[/]{description}")
+            if not no_render:
+                printer(f"[green]AI:[/]{description}")
             return f"Image description by the vision model: {description}"
         else:
-            if self.ui:
-                await self.ui.fancy_print("[cyan]System:[/]Image processing is disabled, check your settings.py")
+            
+            printer("Image processing is disabled, check your settings.py",True)
             logger.warning("Image processing is disabled")
             return None
 
@@ -262,14 +263,13 @@ class ChatManager:
 
         if output == "pass":
             logger.info("Command executed successfully with no output")
-            if self.ui:
-                await self.ui.fancy_print("[cyan]System:[/] Command executed successfully without producing any output")
+            printer("Command executed successfully without producing any output",True)
             return "pass"
 
         if output and input:
             logger.info("Command executed, processing output.")
             if self.ui:
-                await self.ui.fancy_print(f"[cyan]System:[/] Executing [green]'{input}'[/]")
+                printer(f"Executing [green]'{input}'[/]",True)
                 if await self.ui.yes_no_prompt("Do you want to see the output?", default="No"):
                     render_task = asyncio.create_task(self.ui.fancy_print(f"[blue]Shell output[/]:\n{output}"))
                     self.tasks.append(render_task)
@@ -277,7 +277,7 @@ class ChatManager:
                 if await self.ui.yes_no_prompt("Analyze the output?", default="Yes"):
                     if self.tasks:
                         asyncio.create_task(self.execute_tasks())
-                    await self.ui.fancy_print("[cyan]System:[/] Output submitted to the chatbot for analysis...")
+                    printer("Output submitted to the chatbot for analysis...")
                     prompt = PromptHelper.analyzer_helper(input, output)
                     await self._handle_default_mode(input=prompt,no_render=no_render)
 
@@ -292,8 +292,7 @@ class ChatManager:
                     return output
         else:
             logger.warning("No output detected.")
-            if self.ui:
-                await self.ui.fancy_print("[cyan]System:[/] No output detected...")
+            printer("No output detected...",True)
         self.client.last_response = ""
         self.filtering.extracted_code = ""
         logger.info("Shell mode execution completed.")
@@ -308,8 +307,8 @@ class ChatManager:
         response = await self.deploy_chatbot_method(self.client._fetch_response, input)
         code = await self.filtering.process_static(response, True)
         if code:
-            if self.ui and not no_render:
-                await self.ui.fancy_print(code)
+            if not no_render:
+                printer(code)
             return code
 
     async def _handle_default_mode(self, input=None, history=None, no_render=False):

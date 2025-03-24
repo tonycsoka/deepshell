@@ -1,7 +1,9 @@
 import asyncio
 from ui.rendering import Rendering 
 
-def printer(content):    
+def printer(content,system = False):
+    if system:
+        content = "[cyan]System: [/]" + content
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():

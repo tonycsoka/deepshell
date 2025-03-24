@@ -27,7 +27,7 @@ class ChatMode(App):
             self.rendering = Rendering(self)
             self.fancy_print = self.rendering.fancy_print
             self.user_input, self.file, self.file_content = user_input,file,file_content
-            self.system_message = f"\nChat with: [cyan]{self.client.model}[/cyan] in [cyan]{self.client.mode.name}[/cyan] mode.\nType [red]exit[/red] or press [blue]Ctrl+C[/blue] to quit.\n\n"
+            self.system_message = f"\nChat with: [cyan]{self.client.model}[/cyan] in [cyan]{self.client.mode.name}[/cyan] mode.\nType [red]exit[/red] or press [blue]Ctrl+C[/blue] to quit.\n"
 
     def compose(self) -> ComposeResult:
         """Create UI layout with a fixed bottom input and scrollable output."""
