@@ -13,12 +13,12 @@ class Mode(Enum):
 # Ollama Settings
 DEFAULT_HOST = "http://localhost:11434"
 
-DEFAULT_MODEL = "deepseek-r1:8b"
+DEFAULT_MODEL = "phi4:14b"
 CODE_MODEL = "deepseek-coder-v2:16b"
-SHELL_MODEL = "deepseek-coder-v2:16b"
-SYSTEM_MODEL = "deepseek-r1:8b"
-HELPER_MODEL = "deepseek-r1:1.5b"
-VISION_MODEL = "llava:7b"
+SHELL_MODEL = "granite3.2:8b"
+SYSTEM_MODEL = "granite3.2:8b"
+HELPER_MODEL = "granite3.2:2b"
+VISION_MODEL = "minicpm-v:8b"
 EMBEDDING_MODEL = "nomic-embed-text:latest"
 
 # Mapping Mode to Configuration
@@ -34,8 +34,8 @@ MODE_CONFIGS = {
 #Logging
 LOG = True
 LOG_LEVEL = "info" #Possible values: debug, info, warning, error, critical
-LOG_TO_FILE = True
-LOG_TO_UI = False
+LOG_TO_FILE = False
+LOG_TO_UI = True
 
 #Rendering
 RENDER_DELAY = 0.0069 # Delay between rendering lines
@@ -55,7 +55,7 @@ FINALIZE_OUTPUT = True # Output post-processing such as trimming
 MAX_OUTPUT_LINES = 1000
 
 #FileProcessing Config 
-PROCESS_IMAGES = False # Turn this on if you want to get a description of the images
+PROCESS_IMAGES = True # Turn this on if you want to get a description of the images
 IMG_INPUT_RES = (512, 512)
 
 MAX_FILE_SIZE = 6 * 1024 * 1024 #6MB

@@ -1,11 +1,15 @@
 import os
 import re
+
+from ui.printer import printer
 from utils.logger import Logger
 from config.settings import Mode
 from utils.file_utils import FileUtils
 from utils.shell_utils import CommandExecutor
 
 logger = Logger.get_logger()
+
+
 
 class CommandProcessor:
     """Handles user input"""
@@ -15,7 +19,7 @@ class CommandProcessor:
         self.ui = manager.ui
         self.file_utils = FileUtils(manager)
         self.executor = CommandExecutor(self.ui)
-    
+
 
     async def handle_command(self, user_input):
         """Processes commands, handles file/folder operations, and updates config."""
@@ -30,7 +34,9 @@ class CommandProcessor:
             user_input = await self.detect_mode(user_input)
             if user_input is None:
                 return None
-
+            else:
+                if self.manager.client.mode == Mode.SHELL:
+                    return user_input
         # If there is a user input to process
         if user_input:
             target, additional_action = await self.detect_action(user_input)
@@ -62,8 +68,6 @@ class CommandProcessor:
         # Return the original user input if no specific handling was done
         return user_input
 
-
-
    
     async def detect_mode(self, user_input):
         """Detects if input starts with @ and checks if it matches a Mode."""
@@ -91,18 +95,15 @@ class CommandProcessor:
             return after_text
             
         except KeyError:
-            if self.ui:
-                await self.ui.fancy_print("\n\n[red]System:[/]\nInvalid mode override\n")
+            printer("Invalid mode override",True)
             logger.warning("Invalid mode override, suspending input")
             return None
         except Exception as e:
-            if self.ui:
-                await self.ui.fancy_print(f"\n\n[red]System:[/]\n{str(e)}\n")
-            logger.warning(f"{str(e)}")
+            printer(str(e),True)
+            logger.warning(str(e))
             return None
 
-
-   
+ 
     async def detect_action(self, user_input):
         """Detects action, validates/finds target, and processes file/folder."""
 
@@ -133,12 +134,10 @@ class CommandProcessor:
         if not os.path.exists(target):
             choice = await self.file_utils.prompt_search(target)
             if not choice:
-                if self.ui:
-                    await self.ui.fancy_print("[cyan]System:[/cyan] Nothing found")
+                printer("Nothing found",True)
                 return None, None
             if choice == "cancel" or choice == "nothing":
-                if self.ui:
-                    await self.ui.fancy_print("[cyan]System:[/cyan] search canceled by user")
+                printer("Search canceled by user",True)
                 return choice
             target = choice
 
