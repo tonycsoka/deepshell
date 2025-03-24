@@ -87,7 +87,8 @@ class ChatManager:
         else:
             logger.info("No file content, processing user input.")
            #await self.command_processor.ai_handler(user_input)
-            user_input = await self.command_processor.handle_command(user_input)
+            if self.client.mode == Mode.DEFAULT:
+                user_input = await self.command_processor.handle_command(user_input)
 
         user_input, bypass_flag = (
             user_input if isinstance(user_input, tuple) else (user_input, False)
@@ -254,7 +255,7 @@ class ChatManager:
         """
         logger.info("Shell mode execution started. Bypass: %s", bypass)
         if not bypass:
-            code_input = await self._handle_code_mode(PromptHelper.shell_helper(input), no_render=True)
+            code_input = await self._handle_code_mode(PromptHelper.shell_helper(input), shell=True)
             input, output = await self.executor.start(code_input)
         else:
             self.client.switch_mode(Mode.SHELL)
@@ -293,18 +294,24 @@ class ChatManager:
         else:
             logger.warning("No output detected.")
             printer("No output detected...",True)
+            self.client.switch_mode(self.last_mode)
+            return
         self.client.last_response = ""
         self.filtering.extracted_code = ""
         logger.info("Shell mode execution completed.")
         return output
 
-    async def _handle_code_mode(self, input, no_render=False):
-        """
+    async def _handle_code_mode(self, input,shell = False, no_render=False):
+        """:vs
         Handles tasks when the client is in CODE mode.
         Heavy processing (fetching response and static processing) is offloaded.
         """
         logger.info("Code mode execution started.")
         response = await self.deploy_chatbot_method(self.client._fetch_response, input)
+        if shell:
+            command = await self.filtering.extract_shell_command(response)
+            logger.info(f"Command {command}")
+            return command
         code = await self.filtering.process_static(response, True)
         if code:
             if not no_render:

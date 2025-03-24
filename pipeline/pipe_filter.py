@@ -118,43 +118,38 @@ class PipeFilter:
         logger.debug(f"Filtered text: {filtered_text} \nThoughts: {thoughts}")
         return filtered_text
 
-    async def extract_code(self, response):
-        """Extracts shell or code snippets from the response.
+    async def extract_shell_command(self, response: str):
+        """Extracts a shell command from the response."""
+        shell_pattern = r'```(?:sh|bash)\n(.*?)```'
+        match = re.search(shell_pattern, response, re.DOTALL)
 
-        - If `shell` mode:
-          - Extracts the first `sh` or `bash` snippet.
-          - If multiple lines exist, they are combined with `&&`.
-          - If only one line exists, it's returned as is.
-          - After extraction, fixes the command so that it is a single line and doesn't start or end with backticks.
-          - If no code block is found but the response is a single line, it's returned as a shell command.
-        - Otherwise, extracts all code snippets and separates them with comments.
-        """
-        pattern = r'```(\w+)?\n(.*?)```'
-        if self.ollama_client.mode == Mode.SHELL:
-            shell_pattern = r'```(?:sh|bash)\n(.*?)```'
-            match = re.search(shell_pattern, response, re.DOTALL)
-            if match:
-                full_command = match.group(1).strip()
-                commands = [line.strip() for line in full_command.split("\n") if line.strip()]
-                command = commands[0] if len(commands) == 1 else " && ".join(commands)
-            else:
-                single_line = response.strip().split("\n")
-                command = single_line[0].strip() if len(single_line) == 1 and single_line[0] else ""
-            command = command.replace("\n", " && ")
-            command = command.strip("`").strip()
-            return command
-        matches = re.findall(pattern, response, re.DOTALL)
-        code_snippets = []
-        for i, match in enumerate(matches):
-            language, code = match
-            code = code.strip()
-            if self.formatting:
-                if i > 0:
-                    code_snippets.append("\n# --- Next Code Block ---\n")
-                code_snippets.append(f"```{language}\n{code}```")
-            else:
-                if i > 0:
-                    code_snippets.append("\n# --- Next Code Block ---\n")
-                code_snippets.append(code)
-        return "\n".join(code_snippets) if code_snippets else None
+        if match:
+            full_command = match.group(1).strip()
+            commands = [line.strip() for line in full_command.split("\n") if line.strip()]
+            command = commands[0] if len(commands) == 1 else " && ".join(commands)
+        else:
+            single_line = response.strip().split("\n")
+            command = single_line[0].strip() if len(single_line) == 1 and single_line[0] else ""
 
+        command = command.replace("\n", " && ").strip("`").strip()
+        return command
+
+    async def extract_code(self, response: str):
+            """Extracts all code snippets from the response and separates them with comments if needed."""
+            pattern = r'```(\w+)?\n(.*?)```'
+            matches = re.findall(pattern, response, re.DOTALL)
+
+            code_snippets = []
+            for i, match in enumerate(matches):
+                language, code = match
+                code = code.strip()
+                if self.formatting:
+                    if i > 0:
+                        code_snippets.append("\n# --- Next Code Block ---\n")
+                    code_snippets.append(f"```{language}\n{code}```")
+                else:
+                    if i > 0:
+                        code_snippets.append("\n# --- Next Code Block ---\n")
+                    code_snippets.append(code)
+
+            return "\n".join(code_snippets) if code_snippets else None
