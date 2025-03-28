@@ -34,8 +34,8 @@ MODE_CONFIGS = {
 #Logging
 LOG = True
 LOG_LEVEL = "info" #Possible values: debug, info, warning, error, critical
-LOG_TO_FILE = False
-LOG_TO_UI = True
+LOG_TO_FILE = True
+LOG_TO_UI = False
 
 #Rendering
 RENDER_DELAY = 0.0069 # Delay between rendering lines
@@ -55,9 +55,10 @@ FINALIZE_OUTPUT = True # Output post-processing such as trimming
 MAX_OUTPUT_LINES = 1000
 
 #FileProcessing Config 
-PROCESS_IMAGES = True # Turn this on if you want to get a description of the images
+PROCESS_IMAGES = False # Turn this on if you want to get a description of the images
 IMG_INPUT_RES = (512, 512)
 
+IGNORE_DOT_FILES = False
 MAX_FILE_SIZE = 6 * 1024 * 1024 #6MB
 MAX_LINES = 1000
 CHUNK_SIZE = 4000
