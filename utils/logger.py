@@ -72,7 +72,9 @@ class FancyPrintHandler(logging.Handler):
             msg:str, 
             level:int
     )-> str:
-        """Apply color formatting based on the log level."""
+        """
+        Apply color formatting based on the log level.
+        """
         color_map = {
             logging.DEBUG: 'blue',
             logging.INFO: 'green',

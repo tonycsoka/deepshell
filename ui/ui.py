@@ -13,7 +13,7 @@ class ChatMode(App):
     CSS_PATH = "style.css"
 
     def __new__(cls, *args, **kwargs):
-        """Ensure that only one instance of the class exists (Singleton)."""
+        #Ensure that only one instance of the class exists
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -30,14 +30,18 @@ class ChatMode(App):
             self.system_message = f"\nChat with: [cyan]{self.client.model}[/cyan] in [cyan]{self.client.mode.name}[/cyan] mode.\nType [red]exit[/red] or press [blue]Ctrl+C[/blue] to quit.\n"
 
     def compose(self) -> ComposeResult:
-        """Create UI layout with a fixed bottom input and scrollable output."""
+        """
+        Create UI layout with a fixed bottom input and scrollable output.
+        """
         yield Vertical(
             RichLog(highlight=True, markup=True,wrap=True ,id="rich_log"), 
             Input(placeholder="Type here and press Enter...", id="input_field")  
         )
 
     async def on_ready(self) -> None:
-        """Initialize queue and start background listeners."""
+        """
+        Initialize queue and start background listeners.
+        """
         
           # Initialize UI widgets and styles
         self.rich_log_widget = self.query_one(RichLog)
@@ -63,7 +67,9 @@ class ChatMode(App):
         await self.fancy_print(self.system_message)
 
     async def on_key(self, event: events.Key) -> None:
-        """Handles user input from the keyboard."""
+        """
+        Handles user input from the keyboard.
+        """
         if event.key =="ctrl+c":
             await self.exit_app()
 
@@ -88,27 +94,40 @@ class ChatMode(App):
         
 
     async def exit_app(self):
+        """
+        Functions called on exit
+        """
         await self.manager.stop()
 
         self.exit()
 
     def lock_input(self):
+        """
+        Locking down user input fiels.
+        Usefull when rendering multiline output
+        """
         if not self.input_widget.disabled:
             self.input_widget.disabled = True
 
     def unlock_input(self):
+        """
+        Unlocks the user input field
+        """
         if self.input_widget.disabled:
             self.input_widget.disabled = False
             self.input_widget.focus()
 
     def wait_for_input(self):
-        """Helper method to wait for input asynchronously."""
+        """
+        Helper method to wait for input asynchronously.
+        """
         self.input_widget.focus()
         self.input_future = asyncio.Future()
         return self.input_future
 
     async def get_user_input(self, prompt_text: str = "Enter input:",placeholder: str =  "Type here and press Enter:...", input_text: str = "", is_password: bool = False):
-        """Waits for user input asynchronously and returns the value.
+        """
+        Waits for user input asynchronously and returns the value.
         If is_password is True, masks the input like a password.
         """
         await self.fancy_print(f"[cyan]System:[/cyan] {prompt_text}")
@@ -134,7 +153,9 @@ class ChatMode(App):
 
    
     async def yes_no_prompt(self, prompt_text, default="yes"):
-        """Prompts the user with yes or no with an optional default."""
+        """
+        Prompts the user with yes or no with an optional default.
+        """
         valid_defaults = {"yes": True, "y": True, "no": False, "n": False}
         
         while True:

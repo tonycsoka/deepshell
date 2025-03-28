@@ -27,7 +27,9 @@ class CommandProcessor:
             self, 
             user_input: str
     )-> Tuple[str,str | None] | Tuple[None,None]:
-        """Processes commands, handles file/folder operations, and updates config."""
+        """
+        Processes commands, handles file/folder operations, and updates config.
+        """
         
         # Handle shell bypass if user input starts with "!"
         if user_input.startswith("!"):
@@ -77,7 +79,9 @@ class CommandProcessor:
             self, 
             user_input: str
     ) -> str | None:
-        """Detects if input starts with @ and checks if it matches a Mode."""
+        """
+        Detects if input starts with @ and checks if it matches a Mode.
+        """
         mode_switcher = self.manager.client.switch_mode
         parts = user_input.split(" ", 1)
         
@@ -115,7 +119,9 @@ class CommandProcessor:
             self, 
             user_input: str
     ):
-        """Detects action, validates/finds target, and processes file/folder."""
+        """
+        Detects action, validates/finds target, and processes file/folder.
+        """
 
         parts = re.split(r"\band\b", user_input, maxsplit=1)
         main_command = parts[0].strip()
@@ -166,7 +172,9 @@ class CommandProcessor:
             file_content: str, 
             additional_action:  Optional[str] = None
     ):
-        """Prepares user input by combining prompt and file content."""
+        """
+        Prepares user input by combining prompt and file content.
+        """
         formatted_content = f"Content:\n{file_content}"
         if additional_action:
             user_input = additional_action

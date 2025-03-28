@@ -5,6 +5,9 @@ def printer(
         content: str,
         system: bool = False
 ) -> None:
+    """
+    Helper function to pass the output to RichLog Console with optional system prefix
+    """
     if system:
         content = "[cyan]System: [/]" + content
     try:

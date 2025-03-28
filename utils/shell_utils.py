@@ -41,7 +41,9 @@ class CommandExecutor:
 
 
     async def start_shell(self) -> None:
-        """Starts a persistent shell session if not already running."""
+        """
+        Starts a persistent shell session if not already running.
+        """
  
         if self.process is None or self.process.returncode is not None:
             self.process = await asyncio.create_subprocess_exec(
@@ -109,7 +111,9 @@ class CommandExecutor:
             return result if result else f"Command failed with exit code {exit_code}"
         
     async def stop_shell(self):
-        """Stops the persistent shell session."""
+        """
+        Stops the persistent shell session.
+        """
         if self.process and self.process.returncode is None:
             self.process.terminate()
             await self.process.wait()

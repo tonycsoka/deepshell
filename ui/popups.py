@@ -7,7 +7,9 @@ from textual.containers import ScrollableContainer
 from textual.widgets import Static, RadioSet, RadioButton
 
 class RadiolistPopup(Widget):
-    """A popup widget that displays a scrollable radio list for selection and returns the chosen value."""
+    """
+    A popup widget that displays a scrollable radio list for selection and returns the chosen valuei.
+    """
     def __init__(
             self, 
             title: str, 

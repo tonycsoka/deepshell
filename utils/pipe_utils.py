@@ -11,7 +11,9 @@ class PipeUtils:
         self.processor = chat_manager.command_processor
 
     async def read_pipe(self):
-        """Read piped input asynchronously."""
+        """
+        Read piped input asynchronously.
+        """
         loop = asyncio.get_event_loop()
         logger.info("Got the pipe content")
         return await loop.run_in_executor(None, sys.stdin.read)
@@ -20,7 +22,9 @@ class PipeUtils:
             self,
             user_input:Optional[str] = None
     )-> None:
-        """Handles pipe input, formats the user input, and runs the task manager."""
+        """
+        Handles pipe input, formats the user input, and runs the task manager.
+        """
         pipe_input = await self.read_pipe()
 
 

@@ -3,7 +3,9 @@ import os
 EXECUTABLE_NAME = "deepshell" 
 
 def create_symlink():
-    """Create symlink for deepshell in ~/.local/bin"""
+    """
+    Create symlink for deepshell in ~/.local/bin
+    """
     bin_dir = os.path.expanduser("~/.local/bin") 
     symlink_path = os.path.join(bin_dir, EXECUTABLE_NAME)
 
@@ -17,7 +19,9 @@ def create_symlink():
         print(f"Symlink already exists at {symlink_path}")
 
 def remove_symlink():
-    """Remove the symlink for deepshell from ~/.local/bin"""
+    """
+    Remove the symlink for deepshell from ~/.local/bin
+    """
     bin_dir = os.path.expanduser("~/.local/bin") 
     symlink_path = os.path.join(bin_dir, EXECUTABLE_NAME)
 

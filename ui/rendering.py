@@ -18,7 +18,9 @@ class Rendering:
         self._processing_task = None  # Don't start in __init__, defer it
 
     async def start_processing(self) -> None:
-        """Start queue processing task after event loop is running."""
+        """
+        Start queue processing task after event loop is running.
+        """
         if not self._processing_task:
             self._processing_task = asyncio.create_task(self._process_queue())
 
@@ -33,7 +35,9 @@ class Rendering:
             self, 
             content:str,
     ) -> None:
-        """Render string line by line, preserving newlines and whitespace."""
+        """
+        Render string line by line, preserving newlines and whitespace.
+        """
         lines = content.split('\n')
         if len(lines) > 1:
             self.chat_app.lock_input()
@@ -48,7 +52,9 @@ class Rendering:
             self, 
             line:str
     ) -> None:
-        """Render lines while stripping some markdown tags."""
+        """
+        Render lines while stripping some markdown tags.
+        """
         async with self._lock:
             cleaned_line = self.cleaner.sub('', line.rstrip())
             self.chat_app.rich_log_widget.write(cleaned_line)
@@ -57,7 +63,9 @@ class Rendering:
             self, 
             content:str
     ) -> None:
-        """Add print job to queue and ensure execution order."""
+        """
+        Add print job to queue and ensure execution order.
+        """
         await self.queue.put(content)
 
     @staticmethod
