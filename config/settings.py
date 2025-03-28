@@ -63,20 +63,27 @@ MAX_FILE_SIZE = 6 * 1024 * 1024 #6MB
 MAX_LINES = 1000
 CHUNK_SIZE = 4000
 
-SUPPORTED_EXTENSIONS = [
-    # General text formats
-    '.txt', '.md', '.json', '.csv', '.ini', '.cfg', '.xml',  
-    '.yaml', '.yml', '.toml', '.log', '.sql', '.html', '.htm',  
-    '.css', '.js', '.conf', '.properties', '.rst',
+# General text formats
+TEXT_FORMATS = [
+    '.txt', '.md', '.json', '.csv', '.ini', '.cfg', '.xml', 
+    '.yaml', '.yml', '.toml', '.log', '.sql', '.html', '.htm', 
+    '.css', '.js', '.conf', '.properties', '.rst'
+]
 
-    # Programming languages
-    '.py', '.c', '.cpp', '.h', '.hpp', '.java', '.cs', '.rs', '.go',  
-    '.rb', '.php', '.sh', '.bat', '.pl', '.lua', '.swift', '.kt', '.m',  
-    '.r', '.jl', '.dart', '.ts', '.v', '.scala', '.fs', '.asm', '.s',  
-    '.vbs', '.ps1', '.clj', '.groovy', '.perl', '.f90', '.f95', '.ml',
-    
-    # Image formats
+# Programming languages
+PROGRAMMING_LANGUAGES = [
+    '.py', '.c', '.cpp', '.h', '.hpp', '.java', '.cs', '.rs', '.go', 
+    '.rb', '.php', '.sh', '.bat', '.pl', '.lua', '.swift', '.kt', '.m', 
+    '.r', '.jl', '.dart', '.ts', '.v', '.scala', '.fs', '.asm', '.s', 
+    '.vbs', '.ps1', '.clj', '.groovy', '.perl', '.f90', '.f95', '.ml'
+]
+
+# Image formats
+IMAGE_FORMATS = [
     '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.svg'
 ]
+
+SUPPORTED_EXTENSIONS = TEXT_FORMATS + PROGRAMMING_LANGUAGES + IMAGE_FORMATS
+
 
 IGNORED_FOLDERS =  ['__pycache__', '.git', '.github', '.svn', '.hg', 'Android', 'android-studio', 'miniconda3']
