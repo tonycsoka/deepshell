@@ -5,6 +5,7 @@ import aiofiles
 import numpy as np
 from datetime import datetime
 from utils.logger import Logger
+from typing import Tuple, Optional
 from chatbot.helper import PromptHelper
 from ollama_client.api_client import OllamaClient
 from sklearn.metrics.pairwise import cosine_similarity
@@ -14,12 +15,22 @@ logger = Logger.get_logger()
 
 class Project:
 
-    def __init__(self, name="") -> None:
-        self.name = name
+    def __init__(
+            self, 
+            name: str = ""
+    ) -> None:
+
+        self.name:str = name
         self.file_embeddings: dict[str, dict] = {}
         self.folder_structure: dict = {}
 
-    def _index_content(self, identifier: str, content: str, embedding, content_type: str = "file"):
+    def _index_content(
+            self, 
+            identifier: str, 
+            content: str, 
+            embedding: np.ndarray, 
+            content_type: str = "file"
+    ) -> None:
         """
         Generic method to index any content (files or terminal outputs).
 
@@ -38,13 +49,23 @@ class Project:
         self.file_embeddings[identifier] = content_info
         logger.debug(f"Project '{self.name}': Added {content_type} content with id {identifier}")
 
-    def _index_file(self, file_path: str, content: str, embedding):
+    def _index_file(
+            self, 
+            file_path: str, 
+            content: str, 
+            embedding: np.ndarray
+    ) -> None:
         """
         Indexes a file's embedding, wrapping the file path as the unique identifier.
         """
         self._index_content(file_path, content, embedding, content_type="file")
 
-    def _index_terminal_output(self, output: str, identifier: str, embedding):
+    def _index_terminal_output(
+            self, 
+            output: str, 
+            identifier: str, 
+            embedding: np.ndarray
+    ) -> None:
         """
         Indexes terminal code blocks or output, generating a unique identifier if not provided.
         """
@@ -53,7 +74,10 @@ class Project:
             identifier = f"terminal_{datetime.now().isoformat()}"
         self._index_content(identifier, output, embedding, content_type="terminal")
 
-    async def _read_file(self, file_path: str) -> tuple[str, str]:
+    async def _read_file(
+            self, 
+            file_path: str
+    ) -> tuple[str, str]:
         """
         Asynchronously reads a file.
         
@@ -74,7 +98,11 @@ class Project:
 
 class Topic:
 
-    def __init__(self, name="", description="") -> None:
+    def __init__(
+            self, 
+            name: str = "", 
+            description: str = ""
+    ) -> None:
         """
         Initializes a Topic with a name and description.
         The description is embedded and cached for matching.
@@ -90,13 +118,21 @@ class Topic:
         self.history_embeddings = [] 
         self.embedding_cache: dict[str, np.ndarray] = {}
   
-    async def add_message(self, role, message, embedding):
+    async def add_message(
+            self, 
+            role: str, 
+            message: str, 
+            embedding: np.ndarray
+    ) -> None :
         """Stores raw messages and their embeddings."""
         self.history.append({"role": role, "content": message})
         self.history_embeddings.append(embedding)
         logger.info(f"Message added to: {self.name}")
 
-    async def get_relevant_context(self, embedding) -> tuple[float, int]:
+    async def get_relevant_context(
+            self, 
+            embedding: np.ndarray
+    ) -> tuple[float, int]:
         """
         Retrieves the best similarity score and the index of the most relevant message
         from the topic’s history based on cosine similarity.
@@ -124,7 +160,10 @@ class Topic:
  
 class HistoryManager:
 
-    def __init__(self, manager) -> None:
+    def __init__(
+            self, 
+            manager
+    ) -> None:
         """
         Initializes HistoryManager to handle topics and off-topic tracking.
         An "unsorted" topic collects messages and files until a clear topic emerges.
@@ -144,7 +183,12 @@ class HistoryManager:
         self.projects: list[Project] = []
         self.current_project = Project("Unsorted")
     
-    async def add_message(self, role, message,embedding = None) -> None:
+    async def add_message(
+            self, 
+            role: str, 
+            message: str,
+            embedding: np.ndarray | None = None
+    ) -> None:
         """
         Routes a new message to the best-matching topic.
         If no topic meets the similarity threshold, the message is added to the unsorted topic.
@@ -153,7 +197,7 @@ class HistoryManager:
             role (str): Sender's role.
             message (str): The message text.
         """
-        if embedding:
+        if not embedding:
             embedding = await self.fetch_embedding(message)
         topic = await self._match_topic(embedding, exclude_topic = self.current_topic)
         if topic:
@@ -162,7 +206,12 @@ class HistoryManager:
         await self.current_topic.add_message(role, message,embedding)
         asyncio.create_task(self._analyze_history())
  
-    async def add_file(self, file_path: str, content: str,folder: bool = False) -> None:
+    async def add_file(
+            self, 
+            file_path: str, 
+            content: str,
+            folder: bool = False
+    ) -> None:
         """
         Adds a file by computing its combined embedding (file path + content) 
         and routing it to the appropriate project based on the file's folder.
@@ -198,7 +247,12 @@ class HistoryManager:
         # Store the file in the project using a universal indexing method
         self.current_project._index_content(file_path, content, file_embedding, content_type="file")
 
-    async def add_terminal_output(self, command: str, output: str, summary: str) -> None:
+    async def add_terminal_output(
+            self, 
+            command: str, 
+            output: str, 
+            summary: str
+    ) -> None:
         """
         Adds a terminal output by computing its embedding and indexing it 
         within the current project. 
@@ -219,7 +273,10 @@ class HistoryManager:
         
         logger.info(f"Stored terminal output for command: {command}")
 
-    def add_folder_structure(self, structure) -> None:
+    def add_folder_structure(
+            self, 
+            structure: dict
+    ) -> None:
         """
         Adds or updates folder structure for the current project.
         If a structure already exists, archives the current project by adding it
@@ -240,7 +297,10 @@ class HistoryManager:
         self.current_project.folder_structure = structure
         logger.info(f"Folder structure updated for project '{self.current_project.name}'.")
 
-    def format_structure(self, folder_structure):
+    def format_structure(
+            self, 
+            folder_structure: dict
+    ) -> str:
         """
         Formats the folder structure dictionary into a readable string format.
         """
@@ -256,7 +316,10 @@ class HistoryManager:
         
         return format_substructure(folder_structure)
 
-    def find_project_structure(self, query: str) -> Project | None:
+    def find_project_structure(
+            self, 
+            query: str
+    ) -> Project | None:
         """
         Checks if the query contains a folder name corresponding to one of the existing projects.
         Returns the matching Project if found.
@@ -268,14 +331,20 @@ class HistoryManager:
         logger.info("No matching project found in query")
         return None   
 
-    def extract_file_name_from_query(self,query: str):
+    def extract_file_name_from_query(
+            self,
+            query: str
+    ) -> str | None:
         file_pattern = r"([a-zA-Z0-9_\-]+(?:/[a-zA-Z0-9_\-]+)*/[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+|[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+)"
         match = re.search(file_pattern, query)
         if match:
             return match.group(0)
         return None 
         
-    def extract_folder_from_query(self, query: str):
+    def extract_folder_from_query(
+            self, 
+            query: str
+    ) -> str | None:
         """
         Extracts a folder path from the query.
         This regex looks for paths containing at least one slash and that do not end with an extension.
@@ -289,7 +358,13 @@ class HistoryManager:
         return None
  
     
-    async def get_relevant_content(self, query: str, content_type = None, top_k: int = 1, similarity_threshold: float = CONT_THR):
+    async def get_relevant_content(
+            self, 
+            query: str, 
+            content_type: Optional[str] = None, 
+            top_k: int = 1, 
+            similarity_threshold: float = CONT_THR
+    ) -> list | None:
         """
         Retrieves relevant content (files or terminal outputs) by comparing the query
         against the stored embeddings.
@@ -358,7 +433,10 @@ class HistoryManager:
         return None
 
 
-    async def fetch_embedding(self, text: str) -> np.ndarray: 
+    async def fetch_embedding(
+            self, 
+            text: str
+    ) -> np.ndarray: 
         """
         Asynchronously fetches and caches an embedding for the given text.
         Uses async lock to guard the caching mechanism.
@@ -375,7 +453,10 @@ class HistoryManager:
         else:
             return np.array([])
        
-    async def switch_topic(self,topic):
+    async def switch_topic(
+            self,
+            topic: Topic
+    ) -> None:
         async with asyncio.Lock():
             if topic.name != self.current_topic.name:
                 if not any(t.name == self.current_topic.name for t in self.topics):
@@ -383,7 +464,11 @@ class HistoryManager:
                 logger.info(f"Switched to {topic.name}")
                 self.current_topic = topic
 
-    async def _match_topic(self, embedding, exclude_topic: Topic | None = None) -> Topic | None:
+    async def _match_topic(
+            self, 
+            embedding: np.ndarray, 
+            exclude_topic: Topic | None = None
+    ) -> Topic | None:
         """
         Matches a message or file embedding to the most similar topic based on the description embedding,
         optionally excluding a specified topic.
@@ -423,7 +508,11 @@ class HistoryManager:
             logger.info("No suitable topic found.")
             return None
     
-    async def generate_prompt(self, query, num_messages=NUM_MSG):
+    async def generate_prompt(
+            self, 
+            query: str, 
+            num_messages: int = NUM_MSG
+    ) -> list:
         """
         Generates a prompt by retrieving context and content references (files, terminal outputs, etc.)
         from the best matching topic. If the query references a folder, the corresponding folder structure
@@ -475,10 +564,14 @@ class HistoryManager:
         
         return self.current_topic.history[-num_messages:]
 
-    async def generate_topic_info_from_history(self,history, max_retries: int = 3):
+    async def generate_topic_info_from_history(
+            self,
+            history: list, 
+            max_retries: int = 3
+    ) -> Tuple[str, str] | Tuple[None,None]:
         """
         Attempts to extract a topic name and description from the given history.
-        
+        :
         Args:
             history (list): List of unsorted history messages.
             max_retries (int): Maximum number of attempts.

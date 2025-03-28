@@ -17,8 +17,15 @@ class Logger:
     _use_file_handler = LOG_TO_FILE
 
     @classmethod
-    def get_logger(cls, name="deepshell", level=LOG_LEVEL, log_file="deepshell.log"):
-        """Returns a logger instance with a selectable log level, logging only to a file."""
+    def get_logger(
+            cls, 
+            name:str = "deepshell", 
+            level:str = LOG_LEVEL, 
+            log_file:str = "deepshell.log"
+    ) -> logging.Logger:
+        """
+        Returns a logger instance with a selectable log level, logging only to a file.
+        """
         if cls._logger is None:
             cls._logger = logging.getLogger(name)
             log_level = cls.LEVELS.get(level.lower(), logging.INFO)
@@ -41,8 +48,13 @@ class FancyPrintHandler(logging.Handler):
     def __init__(self):
         super().__init__()
 
-    def emit(self, record):
-        """Emit the log record using fancy_print with colors."""
+    def emit(
+            self, 
+            record:logging.LogRecord 
+    ) -> None:
+        """
+        Emit the log record using fancy_print with colors.
+        """
         try:
 
             msg = self.format(record)
@@ -55,7 +67,11 @@ class FancyPrintHandler(logging.Handler):
         except Exception:
             self.handleError(record)
 
-    def _apply_color(self, msg, level):
+    def _apply_color(
+            self, 
+            msg:str, 
+            level:int
+    )-> str:
         """Apply color formatting based on the log level."""
         color_map = {
             logging.DEBUG: 'blue',

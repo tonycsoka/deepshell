@@ -5,7 +5,10 @@ from ollama_client.api_client import OllamaClient
 
 class ClientDeployer:
     """Deploys an isntance of Ollama API Client"""
-    def __init__(self,mode = None):
+    def __init__(
+            self,
+            mode: Mode | None = None
+    ):
         self.args = parse_args()
         self.user_input = self.args.prompt or self.args.string_input or None
         self.file = self.args.file
@@ -42,6 +45,10 @@ class ClientDeployer:
             show_thinking=self.args.thinking
         )
 
-    def generate_config(self, temp=0.7, prompt=""):
+    def generate_config(
+            self, 
+            temp=0.7, 
+            prompt=""
+    ):
         return {"temperature": temp, "system": prompt}
 

@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 from textual import events
 from textual.widget import Widget
 from textual.app import ComposeResult
@@ -7,7 +8,13 @@ from textual.widgets import Static, RadioSet, RadioButton
 
 class RadiolistPopup(Widget):
     """A popup widget that displays a scrollable radio list for selection and returns the chosen value."""
-    def __init__(self, title: str, text: str, options: list[tuple[str, str]], **kwargs):
+    def __init__(
+            self, 
+            title: str, 
+            text: str, 
+            options: list[tuple[str, str]], 
+            **kwargs:Any
+    ) -> None:
         """
         :param title: The title of the popup.
         :param text: The prompt text.
@@ -30,7 +37,10 @@ class RadiolistPopup(Widget):
         self.query_one(RadioSet).focus()
         self.focus()
 
-    async def on_key(self, event: events.Key) -> None:
+    async def on_key(
+            self, 
+            event: events.Key
+    ) -> None:
         radio_set = self.query_one(RadioSet)
         index = radio_set.pressed_index  
         if event.key in ("enter", "space"):

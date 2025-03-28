@@ -19,9 +19,9 @@ async def async_main():
         chat_manager = ChatManager()
         pipe_utils = PipeUtils(chat_manager)
 
-        user_input = args.prompt or args.string_input or None
-        file = args.file or None
-        pipe_content = None
+        user_input = args.prompt or args.string_input or ""
+        file = args.file or ""
+        pipe_content = ""
         stdin_piped = not sys.stdin.isatty()
         stdout_piped = not sys.stdout.isatty()
 

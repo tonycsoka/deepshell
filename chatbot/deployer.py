@@ -1,22 +1,21 @@
+from typing import Tuple
 from utils.logger import Logger
+from config.settings import Mode
 from pipeline.pipe_filter import PipeFilter
+from ollama_client.api_client import OllamaClient
 from ollama_client.client_deployer import ClientDeployer
 
 logger = Logger.get_logger()
 
-class ChatBotDeployer:
+def deploy_chatbot(
+        mode: Mode | None = None
+) -> Tuple[OllamaClient, PipeFilter]:
     """
-    Deploys a ready-to-use chatbot with its own pipeline filter.
+    Deploys a chatbot with an optional mode.
     """
-    def __init__(self):
-        self.client_deployer = ClientDeployer()
+    client_deployer = ClientDeployer(mode)
+    chatbot = client_deployer.deploy()
+    filter = PipeFilter(chatbot)
 
-    @staticmethod
-    def deploy_chatbot(mode=None):
-        """
-        Deploys a chatbot with an optional mode.
-        """
-        client_deployer = ClientDeployer(mode)
-        chatbot = client_deployer.deploy()
-        return chatbot, PipeFilter(chatbot)
+    return chatbot,filter
 

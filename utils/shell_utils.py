@@ -15,7 +15,10 @@ class CommandExecutor:
     monitoring execution, and processing command outputs.
     """
 
-    def __init__(self, ui=None):
+    def __init__(
+            self, 
+            ui=None
+    ):
         """
         Initializes the CommandExecutor.
         
@@ -37,7 +40,7 @@ class CommandExecutor:
         self.sudo_password = False
 
 
-    async def start_shell(self):
+    async def start_shell(self) -> None:
         """Starts a persistent shell session if not already running."""
  
         if self.process is None or self.process.returncode is not None:
@@ -49,7 +52,10 @@ class CommandExecutor:
             )
             logger.info("Started persistent shell session.") 
     
-    async def run_command(self, command: str) -> str | None:
+    async def run_command(
+            self, 
+            command: str
+    ) -> str | None:
         if self.process is None or self.process.stdin is None or self.process.stdout is None:
             await self.start_shell()
             if self.process is None or self.process.stdin is None or self.process.stdout is None:
@@ -113,7 +119,10 @@ class CommandExecutor:
             logger.warning("Process already terminated or not started.")
  
    
-    async def start(self, command=None):
+    async def start(
+            self, 
+        command:str
+    ) -> tuple[str | None, str | None] | tuple[None,None]:
         """
         Starts execution of the given command.
         
@@ -142,7 +151,10 @@ class CommandExecutor:
         return confirmed_command, output
 
 
-    async def execute_command(self, command):
+    async def execute_command(
+            self, 
+            command:str
+    ) -> str | None:
         """
         Executes a shell command asynchronously without starting a shell session.
         
@@ -176,7 +188,10 @@ class CommandExecutor:
         logger.info("Processing command output.")
         return await self._process_command_output(proc)
     
-    async def _start_subprocess(self, command):
+    async def _start_subprocess(
+            self, 
+            command:str
+    ) -> asyncio.subprocess.Process:
         """
         Starts an asynchronous subprocess to execute a command.
         
@@ -193,7 +208,10 @@ class CommandExecutor:
             stderr=asyncio.subprocess.PIPE
         )
 
-    async def _process_command_output(self, proc):
+    async def _process_command_output(
+            self, 
+            proc:asyncio.subprocess.Process
+    ) -> str | None:
         """
         Processes the output of a running command.
         
@@ -202,6 +220,10 @@ class CommandExecutor:
         Returns:
             str: The processed command output.
         """
+        if not proc.stdout:
+            logger.error("Shell subprocess is not running")
+            return
+
         logger.info("Processing command output.")
         output_lines = []
         monitor_task = asyncio.create_task(self._monitor_execution(proc))
@@ -238,7 +260,10 @@ class CommandExecutor:
         return await self._finalize_command_output(output_lines)
 
 
-    def _extract_meaningful_text(self, data):
+    def _extract_meaningful_text(
+            self, 
+            data:str
+    ) -> str | None:
         """
         Cleans and extracts meaningful text from command output.
         
@@ -256,10 +281,13 @@ class CommandExecutor:
         if len(cleaned_data.strip()) > 0:
             return cleaned_data.strip()
         else:
-            return None
+            return
    
 
-    async def _monitor_execution(self, proc):
+    async def _monitor_execution(
+            self, 
+            proc:asyncio.subprocess.Process
+    ) -> None:
         """
         Periodically checks the status of a running process and prompts the user 
         to cancel execution if it exceeds the monitoring interval.
@@ -280,7 +308,10 @@ class CommandExecutor:
                 break
 
     
-    async def _finalize_command_output(self, output_lines):
+    async def _finalize_command_output(
+            self, 
+            output_lines:list
+    ) -> str:
         """
         Finalizes the command output, ensuring truncation if too long and handling errors.
 
@@ -304,8 +335,11 @@ class CommandExecutor:
         
         return output_str
 
-    async def _get_sudo_password(self,return_password = False):
-        """
+    async def _get_sudo_password(
+            self,
+            return_password = False
+    ) -> str | int | None:
+        """ 
         Prompts the user for a sudo password if not already provided.
         If the password was previously validated, revalidate sudo without a password.
         """
@@ -334,7 +368,10 @@ class CommandExecutor:
                 return 1
 
 
-    async def _validate_sudo_password(self, sudo_password):
+    async def _validate_sudo_password(
+            self, 
+            sudo_password:str | None
+    ) -> bool:
         """
         Validates the provided sudo password or checks if sudo is still active.
 
@@ -377,7 +414,10 @@ class CommandExecutor:
             logger.warning("Sudo validation failed.")
             return False
 
-    def _is_text(self, data):
+    def _is_text(
+            self, 
+            data:str
+    ) -> bool:
         """
         Determines whether the given data is likely to be human-readable text.
         
@@ -404,7 +444,10 @@ class CommandExecutor:
         return True 
 
    
-    def _should_handle_prompt(self, decoded_line):
+    def _should_handle_prompt(
+            self, 
+            decoded_line:str
+    ) -> bool:
         """
         Checks if a command output line contains a user prompt requiring a response.
         
@@ -418,7 +461,11 @@ class CommandExecutor:
 
 
    
-    async def _handle_prompt(self, proc, decoded_line):
+    async def _handle_prompt(
+            self, 
+            proc:asyncio.subprocess.Process, 
+            decoded_line:str
+    ) -> None:
         """
         Detects and responds to command-line prompts automatically.
         
@@ -426,6 +473,9 @@ class CommandExecutor:
             proc (asyncio.subprocess.Process): The process awaiting input.
             decoded_line (str): The prompt message from the command output.
         """
+        if not proc.stdin:
+            logger.error("Shell subprocess is not running")
+            return
         if "password:" in decoded_line.lower():
             response =  await self._get_user_input("Enter password: ", is_password=True)
         else:
@@ -438,7 +488,10 @@ class CommandExecutor:
         response = None
 
    
-    async def confirm_execute_command(self, command):
+    async def confirm_execute_command(
+            self, 
+            command:str
+    ) -> str | None:
         """
         Prompts the user to confirm and possibly edit a command before execution.
         
@@ -458,7 +511,15 @@ class CommandExecutor:
         return command if command else None 
 
 
-    async def _get_user_input(self, prompt_text: str = "Enter input: ", is_password=False, input_text=""):
+    async def _get_user_input(
+            self, 
+            prompt_text: str = "Enter input: ", 
+            is_password:bool = False, 
+            input_text:str = ""
+    ) -> str:
+        """
+        Helper function for retriving the user input, if UI is not loaded it will fallback to normal input
+        """
         if self.ui is not None:
             return await self.ui.get_user_input(prompt_text, is_password=is_password, input_text=input_text)
         else:

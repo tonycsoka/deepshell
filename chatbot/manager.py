@@ -1,12 +1,14 @@
 import sys
 import time
+import inspect
 import asyncio
 from ui.ui import ChatMode
 from ui.printer import printer
 from utils.logger import Logger
 from chatbot.helper import PromptHelper
 from chatbot.history import HistoryManager
-from chatbot.deployer import ChatBotDeployer
+from typing import Optional, Any, Callable
+from chatbot.deployer import deploy_chatbot
 from config.settings import Mode, PROCESS_IMAGES
 from utils.command_processor import CommandProcessor
 
@@ -19,11 +21,11 @@ class ChatManager:
     """
 
     def __init__(self):
-        self.client, self.filtering = ChatBotDeployer.deploy_chatbot()
+        self.client, self.filtering = deploy_chatbot()
         self.ui = ChatMode(self) if self.client.render_output else None
         if not self.ui:
             self.client.keep_history = False
-        self.last_mode = None
+        self.last_mode: Mode
 
         self.command_processor = CommandProcessor(self)
         self.file_utils = self.command_processor.file_utils
@@ -63,12 +65,17 @@ class ChatManager:
                 logger.error("Worker task cancelled") 
         await self.executor.stop_shell()
 
-    async def deploy_task(self, user_input=None, file_name=None, file_content=None):
+    async def deploy_task(
+            self, 
+            user_input: str, 
+            file_name: Optional[str] = None, 
+            file_content: Optional[str] = None,
+    )-> str | None:
         """
         Deploys a task based on user input and file content.
         """
         logger.info("Deploy task started.")
-        response = None
+        response, action = None, None
         if self.client.mode != Mode.VISION:
             self.last_mode = self.client.mode
 
@@ -85,19 +92,17 @@ class ChatManager:
                 user_input = f"{user_input} Content: {file_content}"
  
         else:
-            logger.info("No file content, processing user input.")
+            logger.info("Processing user input.")
            #await self.command_processor.ai_handler(user_input)
-            if self.client.mode == Mode.DEFAULT:
-                user_input = await self.command_processor.handle_command(user_input)
-
-        user_input, bypass_flag = (
-            user_input if isinstance(user_input, tuple) else (user_input, False)
-        )
+            if self.client.mode != Mode.SHELL:
+                input, action = await self.command_processor.handle_command(user_input)
+                if input:
+                    user_input = input
         
         logger.info("Executing task manager.")
 
-        if bypass_flag or self.client.mode != Mode.DEFAULT:
-            response = await self.task_manager(user_input=user_input, bypass=bypass_flag)
+        if action or self.client.mode != Mode.DEFAULT:
+            response = await self.task_manager(user_input=user_input, action=action)
             if not response:
                 logger.info("No response detected")
                 return
@@ -118,19 +123,40 @@ class ChatManager:
         logger.info("Deploy task completed.")
         return response
 
-    async def deploy_chatbot_method(self, coro_func, *args, **kwargs):
+
+    async def deploy_chatbot_method(
+        self,
+        coro_func: Callable[..., Any],  # Accepts any callable, but should be validated
+        *args: Any,
+        **kwargs: Any
+    ) -> Any:
         """
         Enqueue a heavy chatbot processing call (e.g. _chat_stream, _fetch_response,
         process_static, _describe_image, etc.) and return its result.
         """
+        # Ensure coro_func is an async function
+        if not asyncio.iscoroutinefunction(coro_func):
+            raise TypeError(f"Expected an async function, but got {type(coro_func).__name__}")
+
+        sig = inspect.signature(coro_func)
+        try:
+            bound_args = sig.bind(*args, **kwargs)  # Proper unpacking
+            bound_args.apply_defaults()
+        except TypeError as e:
+            logger.error(f"Invalid arguments for {coro_func.__name__}: {e}")
+            return None  # Explicitly return None to indicate failure
+
         future = asyncio.get_running_loop().create_future()
         await self.task_queue.put((coro_func, args, kwargs, future))
+
         if not self.worker_running:
             logger.info("Starting task worker from deploy_chatbot_method.")
             asyncio.create_task(self.task_worker())
+
         return await future
 
-    async def task_worker(self):
+
+    async def task_worker(self) -> None:
         """
         Processes tasks from the unified queue sequentially.
         Distinguishes heavy processing calls (tuples of 4 elements) and logs execution times
@@ -170,20 +196,27 @@ class ChatManager:
         logger.info("No more tasks. Task worker is going idle.")
         self.worker_running = False
 
-    async def task_manager(self, user_input=None, history=None, bypass=None):
+    async def task_manager(
+            self, 
+            user_input:str = "", 
+            history:Optional[list] = None, 
+            action:Optional[str] = None
+    ) -> str | None:
         """
         Manages tasks based on the client's mode.
         """
+        if not user_input and not history and not action:
+            logger.warning("Attempt to launch task manager without arguments")
         logger.info("Task manager started in mode: %s", self.client.mode)
 
-        shell_bypass = True if bypass == "shell" else False
-        if bypass is None:
-            bypass = ""
+        shell_bypass = True if action == "shell_bypass" else False
+        if action is None:
+            action = ""
 
         mode_handlers = {
             Mode.SHELL: lambda inp: self._handle_shell_mode(inp, shell_bypass),
             Mode.CODE: self._handle_code_mode,
-            Mode.VISION: lambda inp: self._handle_vision_mode(bypass, inp),
+            Mode.VISION: lambda inp: self._handle_vision_mode(action, inp),
         }
 
         if shell_bypass:
@@ -197,7 +230,14 @@ class ChatManager:
             logger.info("Handling task in default mode.")
             return await self._handle_default_mode(input=user_input, history=history)
 
-    async def _handle_command_processor(self, input,functions):
+    async def _handle_command_processor(
+            self, 
+            input:str,
+            functions:list
+    ):
+        """
+        Function for calling tools via LLM (on supported ollama models)
+        """
         if self.client.mode != Mode.SYSTEM:
             self.client.switch_mode(Mode.SYSTEM)
                                  
@@ -208,7 +248,14 @@ class ChatManager:
         return tools
 
 
-    async def _handle_helper_mode(self, input,strip_json = False):
+    async def _handle_helper_mode(
+            self, 
+            input:str,
+            strip_json:bool = False
+    ) -> str:
+        """
+        Function that Handles helper mode
+        """
         if self.client.mode != Mode.HELPER:
             self.client.switch_mode(Mode.HELPER)
 
@@ -222,7 +269,12 @@ class ChatManager:
             self.client.switch_mode(self.last_mode)
         return filtered_response
 
-    async def _handle_vision_mode(self, target, user_input, no_render=False):
+    async def _handle_vision_mode(
+            self, 
+            target:str, 
+            user_input:str, 
+            no_render:Optional[bool] = False
+    ) -> str | None:
         """
         Handles vision mode by generating an image description.
         The heavy call to describe the image is offloaded.
@@ -245,9 +297,14 @@ class ChatManager:
             
             printer("Image processing is disabled, check your settings.py",True)
             logger.warning("Image processing is disabled")
-            return None
+            return
 
-    async def _handle_shell_mode(self, input, bypass=False, no_render=False):
+    async def _handle_shell_mode(
+            self, 
+            input:str = "", 
+            bypass:bool = False, 
+            no_render:bool = False
+    ) -> str | None:
         """
         Handles tasks when the client is in SHELL mode.
         Command execution is performed immediately, while heavy processing (code conversion
@@ -256,7 +313,9 @@ class ChatManager:
         logger.info("Shell mode execution started. Bypass: %s", bypass)
         if not bypass:
             code_input = await self._handle_code_mode(PromptHelper.shell_helper(input), shell=True)
-            input, output = await self.executor.start(code_input)
+            command, output = await self.executor.start(code_input)
+            if command:
+                input = command
         else:
             self.client.switch_mode(Mode.SHELL)
 
@@ -278,7 +337,7 @@ class ChatManager:
                 if await self.ui.yes_no_prompt("Analyze the output?", default="Yes"):
                     if self.tasks:
                         asyncio.create_task(self.execute_tasks())
-                    printer("Output submitted to the chatbot for analysis...")
+                    printer("Output submitted to the chatbot for analysis...",True)
                     prompt = PromptHelper.analyzer_helper(input, output)
                     await self._handle_default_mode(input=prompt,no_render=no_render)
 
@@ -301,8 +360,13 @@ class ChatManager:
         logger.info("Shell mode execution completed.")
         return output
 
-    async def _handle_code_mode(self, input,shell = False, no_render=False):
-        """:vs
+    async def _handle_code_mode(
+            self, 
+            input:str,
+            shell:bool = False, 
+            no_render:bool=False
+    ) -> str:
+        """
         Handles tasks when the client is in CODE mode.
         Heavy processing (fetching response and static processing) is offloaded.
         """
@@ -313,12 +377,16 @@ class ChatManager:
             logger.info(f"Command {command}")
             return command
         code = await self.filtering.process_static(response, True)
-        if code:
-            if not no_render:
-                printer(code)
-            return code
+        if code and not no_render:
+            printer(code)
+        return str(code)
 
-    async def _handle_default_mode(self, input=None, history=None, no_render=False):
+    async def _handle_default_mode(
+            self, 
+            input:Optional[str] = None, 
+            history:Optional[list] = None, 
+            no_render:bool = False
+    )-> str | None:
         """
         Handles tasks when the client is in the default mode.
         Streaming and filtering are queued together as one job and passed to deploy_chatbot.
@@ -351,7 +419,7 @@ class ChatManager:
             return await self.filtering.process_static(response, False)
 
 
-    async def execute_tasks(self):
+    async def execute_tasks(self) -> None:
         try:
             await asyncio.gather(*self.tasks, return_exceptions=True)
         except Exception as e:

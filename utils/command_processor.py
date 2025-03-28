@@ -1,42 +1,46 @@
 import os
 import re
-
 from ui.printer import printer
 from utils.logger import Logger
 from config.settings import Mode
+from typing import Optional, Tuple
 from utils.file_utils import FileUtils
 from utils.shell_utils import CommandExecutor
 
 logger = Logger.get_logger()
 
 
-
 class CommandProcessor:
     """Handles user input"""
     
-    def __init__(self, manager):
+    def __init__(
+            self, 
+            manager 
+    ):
         self.manager = manager
         self.ui = manager.ui
         self.file_utils = FileUtils(manager)
         self.executor = CommandExecutor(self.ui)
 
 
-    async def handle_command(self, user_input):
+    async def handle_command(
+            self, 
+            user_input: str
+    )-> Tuple[str,str | None] | Tuple[None,None]:
         """Processes commands, handles file/folder operations, and updates config."""
         
         # Handle shell bypass if user input starts with "!"
         if user_input.startswith("!"):
-            user_input = user_input[1:]
-            return user_input, "shell"
+            return user_input[1:], "shell_bypass"
 
         # Handle @mode command
         if user_input.startswith("@"):
-            user_input = await self.detect_mode(user_input)
-            if user_input is None:
-                return None
+            input = await self.detect_mode(user_input)
+            if input is None:
+                return "", None
             else:
                 if self.manager.client.mode == Mode.SHELL:
-                    return user_input
+                    return input, None
         # If there is a user input to process
         if user_input:
             target, additional_action = await self.detect_action(user_input)
@@ -59,17 +63,20 @@ class CommandProcessor:
                 if pass_image:
                     return user_input, target
                 
-                return user_input
+                return user_input, None
             else:
                 # If no target was found and action is "cancel", return None
                 if additional_action == "cancel":
-                    return None
+                    return None, None
 
         # Return the original user input if no specific handling was done
-        return user_input
+        return user_input, None
 
    
-    async def detect_mode(self, user_input):
+    async def detect_mode(
+            self, 
+            user_input: str
+    ) -> str | None:
         """Detects if input starts with @ and checks if it matches a Mode."""
         mode_switcher = self.manager.client.switch_mode
         parts = user_input.split(" ", 1)
@@ -104,7 +111,10 @@ class CommandProcessor:
             return None
 
  
-    async def detect_action(self, user_input):
+    async def detect_action(
+            self, 
+            user_input: str
+    ):
         """Detects action, validates/finds target, and processes file/folder."""
 
         parts = re.split(r"\band\b", user_input, maxsplit=1)
@@ -150,7 +160,12 @@ class CommandProcessor:
 
         return target, additional_action
 
-    def format_input(self, user_input, file_content, additional_action=None):
+    def format_input(
+            self, 
+            user_input: str, 
+            file_content: str, 
+            additional_action:  Optional[str] = None
+    ):
         """Prepares user input by combining prompt and file content."""
         formatted_content = f"Content:\n{file_content}"
         if additional_action:

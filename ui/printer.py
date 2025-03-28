@@ -1,7 +1,10 @@
 import asyncio
 from ui.rendering import Rendering 
 
-def printer(content,system = False):
+def printer(
+        content: str,
+        system: bool = False
+) -> None:
     if system:
         content = "[cyan]System: [/]" + content
     try:

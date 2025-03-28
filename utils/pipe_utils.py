@@ -1,5 +1,6 @@
 import sys
 import asyncio
+from typing import Optional
 from utils.logger import Logger
 
 logger = Logger.get_logger()
@@ -15,7 +16,10 @@ class PipeUtils:
         logger.info("Got the pipe content")
         return await loop.run_in_executor(None, sys.stdin.read)
        
-    async def handle_pipe(self,user_input=None):
+    async def handle_pipe(
+            self,
+            user_input:Optional[str] = None
+    )-> None:
         """Handles pipe input, formats the user input, and runs the task manager."""
         pipe_input = await self.read_pipe()
 

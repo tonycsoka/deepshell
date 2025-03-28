@@ -5,39 +5,50 @@ import asyncio
 import aiofiles
 from PIL import Image
 from io import BytesIO
-from utils.logger import Logger
+from typing import Callable
 from ui.printer import printer
+from utils.logger import Logger
+
 from ui.popups import RadiolistPopup
-from config.settings import SUPPORTED_EXTENSIONS, IGNORED_FOLDERS, MAX_FILE_SIZE, MAX_LINES, CHUNK_SIZE, PROCESS_IMAGES, IMG_INPUT_RES
+from config.settings import IGNORE_DOT_FILES, SUPPORTED_EXTENSIONS, IGNORED_FOLDERS, MAX_FILE_SIZE, MAX_LINES, CHUNK_SIZE, PROCESS_IMAGES, IMG_INPUT_RES
 
 logger = Logger.get_logger()
 
 class FileUtils:
-    def __init__(self, manager, safe_extensions=None, ignore_folders=None, scan_dot_folders=False):
+    def __init__(
+            self, 
+            manager 
+    ):
     
         self.ui = manager.ui
         self.index_file = None
         self.add_folder = None
-
-        self.default_safe_extensions = SUPPORTED_EXTENSIONS
-        self.safe_extensions = safe_extensions or self.default_safe_extensions
-        self.default_ignore_folders = IGNORED_FOLDERS       
-        self.ignore_folders = ignore_folders or self.default_ignore_folders
-        self.scan_dot_folders = scan_dot_folders
-        self.max_file_size = MAX_FILE_SIZE
-        self.max_lines = MAX_LINES
-        self.chunk_size = CHUNK_SIZE
         self.file_locks = {}
 
         if PROCESS_IMAGES:
             self.image_processor = manager._handle_vision_mode
 
 
-    def set_index_functions(self, index_file, add_folder):
+    def set_index_functions(
+            self, 
+            index_file:Callable, 
+            add_folder:Callable
+    ) -> None:
+        """
+        Helper function to avoid circular import
+        """
         self.index_file = index_file
         self.add_folder = add_folder
         
-    async def process_file_or_folder(self, target):
+    async def process_file_or_folder(
+            self, 
+            target:str
+    )-> str | int | None:
+        """
+        Processing the target, if exists. 
+        If not, tries to find the path.
+        Returns full path if target is confirmed, esle -1
+        """
         target = target.strip()
        
         if not os.path.exists(target):
@@ -59,7 +70,15 @@ class FileUtils:
 
 
    
-    async def read_file(self, file_path):
+    async def read_file(
+            self, 
+            file_path:str,
+            max_file_size:int = MAX_FILE_SIZE,
+            max_lines: int = MAX_LINES
+    ) -> str | None:
+        """
+        Returns the content of a file or image description from the VISION model
+        """
         try:
             if not self._is_safe_file(file_path):
                 logger.info(f"Skipping file (unsupported): {file_path}")
@@ -84,8 +103,8 @@ class FileUtils:
 
                 printer(f"Reading {file_path}",True)
 
-                if os.path.getsize(file_path) > self.max_file_size:
-                    content = await self._read_last_n_lines(file_path, self.max_lines)
+                if os.path.getsize(file_path) > max_file_size:
+                    content = await self._read_last_n_lines(file_path, max_lines)
                 else:
                     async with aiofiles.open(file_path, 'r', encoding="utf-8", errors="ignore") as file:
                         content = await file.read()
@@ -97,12 +116,20 @@ class FileUtils:
 
 
    
-    def _is_safe_file(self, file_path):
+    def _is_safe_file(
+            self, 
+            file_path:str,
+            supported_extensions:list = SUPPORTED_EXTENSIONS
+    ) -> bool:
+        """
+        Returns True if file located at provided file_path:str is in the SUPPORTED_EXTENSIONS list
+        or if the file is without extension is a text file.
+        """
         if os.path.getsize(file_path) == 0:
             logger.info(f"Skipping empty file: {file_path}")
             return False
 
-        if any(file_path.lower().endswith(ext) for ext in self.safe_extensions):
+        if any(file_path.lower().endswith(ext) for ext in supported_extensions):
             return True  
 
         if '.' not in os.path.basename(file_path):
@@ -112,35 +139,59 @@ class FileUtils:
         return False
 
    
-    def _is_text_file(self, file_path):
+    def _is_text_file(
+            self, 
+            file_path:str
+    )-> bool:
+        """ 
+        Checks if provided file at the file_path:str is a text file
+        Return bool
+        """
         try:
             mime = magic.Magic(mime=True)
             mime_type = mime.from_file(file_path)
             
             logger.info(f"Detected MIME type for '{file_path}': {mime_type}")
             
-            return mime_type.startswith("text")
+            if mime_type.startswith("text"):
+                return True
+            else: 
+                return False
         
         except Exception as e:
             logger.error(f"Error detecting MIME type for '{file_path}': {e}")
+            return False
 
 
-    def _is_image(self, file_path):
+    def _is_image(
+            self, 
+            file_path:str
+    )-> bool:
+        """ Checks if file at provided file_path:str is an image
+        Returns bool"""
         try:
             mime = magic.Magic(mime=True)
             return mime.from_file(file_path).startswith("image")
         except Exception:
             return False
 
-    async def _process_image(self, file_path):
+    async def _process_image(
+            self, 
+            file_path:str,
+            encoding_format:str = "PNG",
+            img_size:tuple[int,int] = IMG_INPUT_RES
+    ) -> str | None:
+        """ 
+        Open image at provided file_path:str and encodes it as base64:str 
+        """
         logger.info(f"Encoding image: {file_path}")
         loop = asyncio.get_running_loop()
         try:
             def resize_and_encode():
                 with Image.open(file_path) as img:
-                    img.thumbnail(IMG_INPUT_RES)
+                    img.thumbnail(img_size)
                     buffer = BytesIO()
-                    img.save(buffer, format="PNG")
+                    img.save(buffer, format=encoding_format)
                     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
             encoded_image = await loop.run_in_executor(None, resize_and_encode)
@@ -148,7 +199,15 @@ class FileUtils:
         except Exception as e:
             logger.error(f"Error processing image {file_path}: {e}")
 
-    async def _read_last_n_lines(self, file_path, num_lines):
+    async def _read_last_n_lines(
+            self, 
+            file_path:str, 
+            num_lines:int,
+            chunk_size:int = CHUNK_SIZE
+    ) -> str:
+        """
+        Trimps the file output.
+        """
         buffer = []
         loop = asyncio.get_running_loop()
 
@@ -158,9 +217,9 @@ class FileUtils:
             data = ""
 
             while pos > 0 and len(buffer) < num_lines:
-                pos = max(0, pos - self.chunk_size)
+                pos = max(0, pos - chunk_size)
                 await file.seek(pos)
-                chunk = await file.read(self.chunk_size)
+                chunk = await file.read(chunk_size)
                 data = chunk + data
                 lines = data.splitlines()
 
@@ -172,7 +231,13 @@ class FileUtils:
 
             return "\n".join(buffer) if buffer else "[File is empty]"
 
-    def _get_file_size(self, file_path):
+    def _get_file_size(
+            self, 
+            file_path:str
+    ) -> int:
+        """
+        Returns the file size
+        """
         try:
             with open(file_path, "rb") as f:
                 f.seek(0, 2)
@@ -180,7 +245,14 @@ class FileUtils:
         except Exception:
             return 0
   
-    def generate_structure(self, folder_path, root_folder, prefix=""):
+    def generate_structure(
+            self, 
+            folder_path:str, 
+            root_folder:str, 
+            prefix:str = "",
+            ignored_folders:list = IGNORED_FOLDERS,
+            ignore_dot_files: bool = IGNORE_DOT_FILES
+    ) -> dict:
         """
         Generates a dictionary representation of the folder structure.
         All files within the folder are included, regardless of file type.
@@ -199,7 +271,7 @@ class FileUtils:
 
         for item in items:
             item_path = os.path.join(folder_path, item)
-            if os.path.isdir(item_path) and item not in self.ignore_folders and (self.scan_dot_folders or not item.startswith('.')):
+            if os.path.isdir(item_path) and item not in ignored_folders and (not ignore_dot_files and item.startswith('.')):
                 structure[folder_name][item] = self.generate_structure(item_path, root_folder, prefix + "--")
             elif os.path.isfile(item_path):
                 relative_path = os.path.relpath(item_path, root_folder) if root_folder else item_path
@@ -209,7 +281,12 @@ class FileUtils:
         return structure
    
 
-    async def read_folder(self, folder_path, root_folder=None):
+    async def read_folder(
+            self, 
+            folder_path:str, 
+            root_folder:str| None = None,
+            ignored_folders: list = IGNORED_FOLDERS
+    ) -> str | None:
         """Recursively scans and reads all files in a folder.
            The folder structure is generated for all files; however, only files with safe extensions
            are attempted to be read (others are skipped).
@@ -230,7 +307,7 @@ class FileUtils:
 
             # Collecting content of all files
             for root, _, files in os.walk(folder_path):
-                if any(ignored in root.split(os.sep) for ignored in self.ignore_folders):
+                if any(ignored in root.split(os.sep) for ignored in ignored_folders):
                     continue
                 for file in files:
                     file_path = os.path.join(root, file)
@@ -251,7 +328,11 @@ class FileUtils:
             logger.error(f"Error: Permission denied to access '{folder_path}'.")
 
 
-    async def search_files(self, missing_path, search_dir=None):
+    async def search_files(
+            self, 
+            missing_path:str="", 
+            search_dir=None
+    ) -> list:
         """
         Searches for a missing file or folder in the specified directory.
         Defaults to the home directory if none is provided.
@@ -271,7 +352,10 @@ class FileUtils:
         return results
 
   
-    async def prompt_search(self, missing_path):
+    async def prompt_search(
+            self, 
+            missing_path:str
+    ) -> str:
         """
         Prompts the user to search for a file when the target is missing.
         Uses a popup with a radiolist if UI is available, falling back to terminal input.

@@ -1,18 +1,25 @@
 import re
 from ui.printer import printer
 from utils.logger import Logger
-from config.settings import Mode
+from ollama_client.api_client import OllamaClient
 
 logger = Logger.get_logger()
 
 class PipeFilter:
-    def __init__(self, ollama_client):
+    def __init__(
+            self, 
+            ollama_client:OllamaClient
+    ):
         self.ollama_client = ollama_client
         self.input_buffer = ollama_client.output_buffer  
         self.formatting = ollama_client.render_output
         self.extracted_code = None
  
-    async def process_stream(self, extract_code=False, render=True):
+    async def process_stream(
+            self, 
+            extract_code:bool = False, 
+            render:bool = True
+    ) -> None:
         """Processes the input stream, handling thoughts and code differently based on config."""
         full_input = ""
         results = ""
@@ -93,7 +100,11 @@ class PipeFilter:
         logger.debug(f"PipeFilter output: {results} \nThoughts: {thought_buffer}")
 
 
-    async def process_static(self, text: str, extract_code=False):
+    async def process_static(
+            self, 
+            text: str, 
+            extract_code:bool = False
+    ) -> str:
         """Processes a static string, handling thoughts and code differently based on config."""
         if extract_code:
             self.ollama_client.last_response = text
@@ -118,7 +129,10 @@ class PipeFilter:
         logger.debug(f"Filtered text: {filtered_text} \nThoughts: {thoughts}")
         return filtered_text
 
-    async def extract_shell_command(self, response: str):
+    async def extract_shell_command(
+            self, 
+            response: str
+    ) -> str:
         """Extracts a shell command from the response."""
         shell_pattern = r'```(?:sh|bash)\n(.*?)```'
         match = re.search(shell_pattern, response, re.DOTALL)
@@ -134,7 +148,10 @@ class PipeFilter:
         command = command.replace("\n", " && ").strip("`").strip()
         return command
 
-    async def extract_code(self, response: str):
+    async def extract_code(
+            self, 
+            response: str
+    ) -> str | None:
             """Extracts all code snippets from the response and separates them with comments if needed."""
             pattern = r'```(\w+)?\n(.*?)```'
             matches = re.findall(pattern, response, re.DOTALL)
