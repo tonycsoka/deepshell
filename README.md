@@ -68,6 +68,7 @@ python3 main.py
 - `--system` - The AI whispers through logs and configs, extracting secrets with cold precision, revealing only what’s needed.
 
 **Voice of the Machine: The Art of Commanding its Tongue:**
+
 Speak in the language of the machine—prefix your words with !, and the AI, attuned to the art of command, will instantly interpret and execute your directive. The system will then return its results, woven into a clean and structured markup response, as if deciphering its own language.
 Example:
 
@@ -94,6 +95,7 @@ deepshell "open this folder and analyze the code"
 ```
 
 **Echoes in the Abyss: The Neovim Conduit**
+
 The [DeepShell.nvim plugin](https://github.com/Abyss-c0re/deepshell-nvim) serves as the unseen bridge between the arcane depths of Neovim and the profound intelligence of DeepShell.
 
 _A tool forged for precision in a chaotic world. Your words, its execution, seamless in form._
