@@ -82,7 +82,10 @@ class PromptHelper:
 
 
     @staticmethod
-    def metadata_code(content: str) -> str:
+    def analyze_code(content: str) -> str:
+        """
+        Generates a prompt instructing the model to analyze the code and provide description in JSON format
+        """
         return f"""
         Analyze the following code and generate structured metadata in JSON format. The metadata should include the following categories:
         1. Functions: List of function names and their descriptions (if any).
