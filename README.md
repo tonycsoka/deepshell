@@ -96,7 +96,9 @@ deepshell "open this folder and analyze the code"
 
 **Echoes in the Abyss: The Neovim Conduit**
 
-The [DeepShell.nvim plugin](https://github.com/Abyss-c0re/deepshell-nvim) serves as the unseen bridge between the arcane depths of Neovim and the profound intelligence of DeepShell.
+The [DeepShell.nvim](https://github.com/Abyss-c0re/deepshell-nvim) plugin serves as the unseen bridge between the arcane depths of Neovim and the profound intelligence of DeepShell.
+
+
 
 _A tool forged for precision in a chaotic world. Your words, its execution, seamless in form._
 
