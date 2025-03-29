@@ -20,3 +20,9 @@ dependencies = [
 
 [project.scripts]
 deepshell = "main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ui = ["*.css"]
