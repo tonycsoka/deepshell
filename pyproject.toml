@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deepshell"
+version = "0.1.0"
+description = "Local deepseek shell"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "aiofiles==24.1.0",
+  "numpy==2.2.4",
+  "ollama==0.4.7",
+  "Pillow==11.1.0",
+  "python_magic==0.4.27",
+  "scikit_learn==1.6.1",
+  "textual==2.1.2",
+]
+
+[project.scripts]
+deepshell = "main:main"
